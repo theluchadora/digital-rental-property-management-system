@@ -1,0 +1,454 @@
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =====================================================
+// ENUMS
+// =====================================================
+
+enum UserRole {
+  TENANT
+  OWNER
+  ADMIN
+}
+
+enum PropertyType {
+  BUILDING   // Apartment building that contains units
+  UNIT       // An apartment inside a building
+  HOUSE      // Single family home (no units inside)
+  VEHICLE    // Car, truck, motorcycle
+}
+
+enum PropertyStatus {
+  VACANT
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum LeaseStatus {
+  INITIATED
+  ACTIVE
+  AWAITINGPAYMENT
+  EXPIRED
+  TERMINATED
+
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PAID
+  OVERDUE
+  VOID
+  REFUNDED
+}
+
+
+
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+}
+
+
+
+enum NotificationType {
+  INVOICE
+  MAINTENANCE
+  MESSAGE
+  SYSTEM
+  LEASE
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// =====================================================
+// USERS
+// =====================================================
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String
+  firstName       String
+  middleName      String?
+  lastName        String
+  phoneNumber     String
+  profileImageUrl String?
+  role            UserRole  @default(TENANT)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  
+  // Relations
+  properties      Property[]     // Properties they own
+  leases          Lease[]        @relation("TenantLeases") // Leases where user is tenant
+  ownedLeases     Lease[]        @relation("OwnerLeases")  // Leases where user is owner
+  paymentReceipts PaymentReceipt[] // Receipts uploaded by this user
+  invoiceReviews  Invoice[] @relation("InvoiceReviewer") // Invoices reviewed by this user
+  tenantInvoices  Invoice[]      @relation("InvoiceTenant") // Invoices where user is the tenant
+  notifications   Notification[] // Notifications for this user
+  maintenanceRequests Maintenance[] // Maintenance requests created by this user
+  sentMessages    Message[]      @relation("SenderMessages")
+  receivedMessages Message[]     @relation("RecipientMessages")
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+
+
+// =====================================================
+// PROPERTIES (Main table - everything in one place)
+// =====================================================
+
+model Property {
+  id          String       @id @default(uuid()) @db.Uuid
+  ownerId     String       @db.Uuid
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  // Basic Info
+  title       String
+  description String?
+  type        PropertyType
+  status      PropertyStatus    @default(VACANT)
+  hasUnits Boolean   @default(false)
+
+
+  
+  // ---------- SELF-REFERENCING (For units inside buildings) ----------
+  parentId    String?      @db.Uuid
+  parent      Property?    @relation("PropertyUnits", fields: [parentId], references: [id])
+  units       Property[]   @relation("PropertyUnits")
+  
+  // ---------- LOCATION (For BUILDING, HOUSE, UNIT - NULL for VEHICLE) ----------
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+
+  
+  // ---------- UNIT SPECIFIC (Only for type: UNIT) ----------
+  unitNumber  String?
+  floorNumber Int?
+  bedrooms    Int?
+  bathrooms   Float?
+  squareFeet  Int?
+  hasGarage   Boolean?     @default(false)
+  hasGarden   Boolean?     @default(false)
+  
+ 
+  
+  // ---------- BUILDING SPECIFIC (Only for type: BUILDING) ----------
+  totalUnits  Int?
+  hasElevator Boolean?     @default(false)
+  hasParking  Boolean?     @default(false)
+  hasGym      Boolean?     @default(false)
+  hasPool     Boolean?     @default(false)
+  hasSecurity Boolean?     @default(false)
+  yearBuilt   Int?
+  
+ 
+
+  
+  // ---------- VEHICLE SPECIFIC (Only for type: VEHICLE) ----------
+  plateNumber String?      @unique
+  brand       String?
+  model       String?
+  year        Int?
+  color       String?
+  mileage     Int?
+  fuelType    FuelType?
+  seats       Int?
+  
+  // ---------- PRICING (For all rentable types) ----------
+  monthlyRent     Decimal?   @db.Decimal(10, 2)
+  paidEvery      Int?    
+  minLeaseMonth  Int
+  latefee       Int
+
+  
+  // ---------- ADDITIONAL INFO ----------
+  features    Json?        // JSON array of features
+  rules       String?      // Rental rules, pet policy
+  notes       String?      // Internal notes for OWNER
+  
+  // ---------- PHOTOS (Linked table) ----------
+  photos      PropertyPhoto[]
+  
+  // ---------- LEASES & REQUESTS ----------
+  leases      Lease[]
+  maintenance Maintenance[] @relation("PropertyMaintenance")
+
+  
+  // ---------- TIMESTAMPS ----------
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  // ---------- CONSTRAINTS & INDEXES ----------
+  @@unique([parentId, unitNumber])
+  @@index([ownerId])
+  @@index([type])
+  @@index([parentId])
+  @@index([city])
+  @@index([monthlyRent])
+  @@map("properties")
+}
+
+// =====================================================
+// PROPERTY PHOTOS
+// =====================================================
+
+model PropertyPhoto {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @db.Uuid
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  url          String   // Secure URL from Cloudinary
+ 
+  uploadedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([propertyId])
+  @@map("property_photos")
+}
+
+// =====================================================
+// LEASES
+// =====================================================
+
+model Lease {
+  id          String     @id @default(uuid()) @db.Uuid
+  propertyId  String     @db.Uuid
+  property    Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenantId    String     @db.Uuid
+  tenant      User       @relation("TenantLeases", fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerId     String     @db.Uuid
+  owner       User       @relation("OwnerLeases", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  paidEvery  Int
+  
+  // Lease terms
+  startDate   DateTime
+  endDate     DateTime
+  monthlyRent Decimal    @db.Decimal(10, 2)
+  status      LeaseStatus @default(INITIATED)
+  latefee    Int
+  
+
+  //moving in and out
+  moveInDate DateTime
+  moveOutDate DateTime
+  
+
+  
+  // Invoices
+  invoices    Invoice[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  @@index([propertyId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leases")
+}
+
+
+
+// =====================================================
+// INVOICES & PAYMENTS
+// =====================================================
+
+model Invoice {
+  id          String       @id @default(uuid()) @db.Uuid
+  leaseId     String       @db.Uuid
+  lease       Lease        @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+
+  tenantId      String        @db.Uuid
+  tenant        User          @relation("InvoiceTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+
+
+  
+  billingMonth DateTime     // 2024-01-01 = January 2024
+  amountDue    Decimal      @db.Decimal(10, 2)
+  amountPaid Decimal @default(0) @db.Decimal(10,2)
+  dueDate      DateTime
+  paidAt       DateTime?
+  status       InvoiceStatus @default(UNPAID)
+  
+  // Late fee
+  lateFeeApplied Decimal?    @db.Decimal(10, 2)
+  lateFeePaid    Boolean?    @default(false)
+  
+  // Line items (store as JSON)
+  lineItems    Json?        // [{description: "Rent", amount: 1200}, {description: "Parking", amount: 50}]
+  
+  // Review (for PENDING_REVIEW status)
+  reviewNote   String?
+  reviewedAt   DateTime?
+  reviewedById String? @db.Uuid
+  reviewedBy User? @relation("InvoiceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  
+  // Relations
+  receipts     PaymentReceipt[]
+  
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  
+  @@unique([leaseId, billingMonth])
+  @@index([leaseId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model PaymentReceipt {
+  id            String   @id @default(uuid()) @db.Uuid
+  invoiceId     String   @db.Uuid
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  // Receipt file
+  fileUrl       String
+  cloudinaryId  String?
+  fileName      String?
+  
+  // Payment details
+  amount        Decimal  @db.Decimal(10, 2)
+  paymentDate   DateTime
+  transactionRef String? // Bank reference
+  
+  // Additional info
+  notes         String?
+  uploadedBy    String?  @db.Uuid
+  uploadedByUser User?   @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  uploadedAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([invoiceId])
+  @@index([uploadedBy])
+  @@map("payment_receipts")
+}
+
+// =====================================================
+// NOTIFICATIONS
+// =====================================================
+
+model Notification {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @db.Uuid
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String
+  content   String
+  isRead    Boolean      @default(false)
+  readAt    DateTime?
+  createdAt DateTime     @default(now())
+  
+  // Optional relation fields for different notification types
+   invoiceId String? @db.Uuid
+    leaseId   String? @db.Uuid
+    messageId String? @db.Uuid
+
+
+    
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([invoiceId])
+  @@index([leaseId])
+ @@index([messageId])
+}
+
+
+
+// =====================================================
+// MESSAGES
+// =====================================================
+
+model Message {
+  id          String   @id @default(uuid()) @db.Uuid
+  senderId    String   @db.Uuid
+  sender      User     @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String   @db.Uuid
+  receiver   User     @relation("RecipientMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  subject     String?
+  content      String
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+
+
+  createdAt   DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([isRead])
+  @@map("messages")
+}
+
+// =====================================================
+// MAINTENANCE REQUESTS
+// =====================================================
+
+model Maintenance {
+  id          String              @id @default(uuid()) @db.Uuid
+  propertyId  String              @db.Uuid
+  property    Property            @relation("PropertyMaintenance", fields: [propertyId], references: [id], onDelete: Cascade)
+  createdBy   String              @db.Uuid
+  createdByUser User              @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  
+  title       String
+  description String?
+  priority    MaintenancePriority @default(MEDIUM)
+  status      MaintenanceStatus   @default(PENDING)
+  
+  scheduledDate DateTime?
+  completedDate DateTime?
+  
+  estimatedCost Decimal?          @db.Decimal(10, 2)
+  actualCost    Decimal?          @db.Decimal(10, 2)
+  
+  notes       String?
+  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  
+  @@index([propertyId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdBy])
+  @@map("maintenance_requests")
+}
+
+
+
+

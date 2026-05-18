@@ -1,0 +1,99 @@
+import {Request , Response } from "express";
+import * as propertiesService from "../services/propertiesService";
+
+export const createProperty = async (req: Request & { user?: { id: string , role: string } }, res: Response) => {
+  try {
+    const ownerId = req.user?.id;
+    if (!ownerId) return res.status(401).json({ error: "Unauthorized" });
+    const role = req.user?.role;
+    if (role !== "OWNER") return res.status(403).json({ error: "Only landlords can create properties" });
+    // Pass all data including photos to service
+    const property = await propertiesService.createProperty({ ownerId, ...req.body });
+    res.status(201).json(property);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "Failed to create property" });
+  }
+};
+
+
+export const getPropertyById = async (req: Request, res: Response) => {
+  try {
+    const property = await propertiesService.getPropertyById(req.params.id as string);
+    if (!property) return res.status(404).json({ error: "Property not found" });
+    res.json(property);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to get property" });
+  }
+};
+
+export const listProperties = async (_req: Request, res: Response) => {
+  try {
+    const properties = await propertiesService.listProperties();
+    res.json(properties);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to list properties" });
+  }
+};
+
+//get properties by owner id
+export const getPropertiesByOwner = async (req: Request, res: Response) => {
+  try {
+    const ownerId = req.params.ownerId as string;
+    const properties = await propertiesService.getPropertiesByOwner(ownerId);
+    res.json(properties);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to list properties" });
+  }
+};
+
+//get units under a property
+export const getUnitsUnderProperty = async (req: Request, res: Response) => {
+  try {
+    const propertyId = req.params.propertyId as string;
+    const units = await propertiesService.getUnitsUnderProperty(propertyId);
+    res.json(units);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to list units" });
+  }
+};
+
+//get vacant units under a property
+export const getVacantUnitsUnderProperty = async (req: Request, res: Response) => {
+  try {
+    const propertyId = req.params.propertyId as string;
+    const units = await propertiesService.getVacantUnitsUnderProperty(propertyId);
+    res.json(units);
+  } catch (err  :any) {
+    res.status(500).json({ error: err.message || "Failed to list units" });
+  }
+};
+
+//get vacant properties from the main page
+export const getVacantProperties = async (_req: Request, res: Response) => {
+  try {
+    const properties = await propertiesService.getVacantProperties();
+    res.json(properties);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to list properties" });
+  }
+};
+
+export const updateProperty = async (req: Request, res: Response) => {
+  try {
+    const updated = await propertiesService.updateProperty(req.params.id as string, req.body);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "Failed to update property" });
+  }
+};
+
+export default {
+  createProperty,
+  getPropertyById,
+  listProperties,
+  getPropertiesByOwner,
+  getUnitsUnderProperty,
+  getVacantUnitsUnderProperty,
+  getVacantProperties,
+  updateProperty,
+};

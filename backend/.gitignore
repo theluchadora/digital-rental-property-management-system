@@ -1,0 +1,53 @@
+
+
+./# Runtime data / Dependencies
+node_modules/
+jspm_packages/
+web_modules/
+
+# Environment variables and credentials (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Build outputs and distribution directories
+dist/
+build/
+out/
+
+# Logs and diagnostic files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+logs/
+*.log
+
+# Testing, coverage, and reports
+coverage/
+.nyc_output/
+html-report/
+
+# IDE, Editor, and System files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Optional local/temporary file caching
+.eslintcache
+.parcel-cache
+.turbo/
+.vercel/
+.next/
+
+/src/generated/prisma

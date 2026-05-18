@@ -1,0 +1,223 @@
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { mockProperties, mockUnits, propertyImages } from "@/data/mockData";
+import { MapPin, ArrowLeft, Bed, Bath, Maximize, Building2, CheckCircle, MessageSquare, CalendarCheck } from "lucide-react";
+import PhotoGalleryDialog from "@/components/PhotoGalleryDialog";
+import { useToast } from "@/hooks/use-toast";
+import { propertiesApi } from "@/lib/api/properties";
+import type { Property } from "@/types/api";
+
+export default function TenantPropertyDetailPage() {
+  const { propertyId } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [property, setProperty] = useState<Property | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProperty() {
+      if (!propertyId) return;
+      try {
+        const response = await propertiesApi.getById(propertyId);
+        setProperty(response.data.property);
+      } catch (err) {
+        console.error("Failed to load property:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadProperty();
+  }, [propertyId]);
+
+  const availableUnits = property?.units?.filter(u => u.status === "VACANT") || [];
+  const images = [
+    property?.media?.[0]?.filePath || propertyImages[0],
+    propertyImages[3], propertyImages[2], propertyImages[4], propertyImages[1], propertyImages[5],
+  ];
+
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  const openGallery = (index: number) => { setGalleryIndex(index); setGalleryOpen(true); };
+
+  const handleApply = () => {
+    if (!property) return;
+    toast({ title: "Redirecting to Messages", description: "Send a message to the property owner to apply." });
+    navigate(property.ownerId ? `/messages?userId=${property.ownerId}` : "/messages");
+  };
+
+  const handleSchedule = () => {
+    if (!property) return;
+    toast({ title: "Redirecting to Messages", description: "Send a message to schedule a viewing." });
+    navigate(property.ownerId ? `/messages?userId=${property.ownerId}` : "/messages");
+  };
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-muted-foreground">Loading property details...</div>;
+  }
+
+  if (!property) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-muted-foreground mb-4">Property not found.</p>
+        <Link to="/browse" className="text-secondary hover:underline">Back to Browse</Link>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Link to="/browse" className="inline-flex items-center gap-1 text-sm text-secondary hover:underline mb-4">
+        <ArrowLeft className="h-4 w-4" /> Back to Browse
+      </Link>
+
+      {/* Image Gallery */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="col-span-2 md:col-span-2 row-span-2">
+          <img src={images[0]} alt={property.title} className="h-48 md:h-72 w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(0)} />
+        </div>
+        <div className="hidden md:block">
+          <img src={images[1]} alt="Gallery" className="h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(1)} />
+        </div>
+        <div className="col-span-1">
+          <img src={images[2]} alt="Gallery" className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(2)} />
+        </div>
+        <div className="col-span-1 relative">
+          <img src={images[3]} alt="Gallery" className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(3)} />
+          <button onClick={() => openGallery(0)} className="absolute inset-0 flex items-center justify-center rounded-lg bg-foreground/50 text-primary-foreground font-semibold hover:bg-foreground/60 transition-colors">
+            +{images.length} Photos
+          </button>
+        </div>
+      </div>
+
+      <PhotoGalleryDialog images={images} initialIndex={galleryIndex} open={galleryOpen} onOpenChange={setGalleryOpen} />
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <div>
+            <Badge className="bg-secondary text-secondary-foreground mb-2">{property.status}</Badge>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{property.title}</h1>
+            <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" /> {property.addressStreet}, {property.addressSubCity}, {property.addressCity}
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader><CardTitle>About this Property</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground leading-relaxed">{property.description}</p>
+              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                {[
+                  { label: "Year Built", value: property.buildingDetails?.yearBuilt },
+                  { label: "Total Floors", value: property.buildingDetails?.totalFloors },
+                  { label: "Total Units", value: property.buildingDetails?.totalUnits },
+                  { label: "Type", value: property.buildingDetails?.buildingType },
+                ].map((s, i) => (
+                  <div key={i} className="text-center">
+                    <p className="text-lg font-bold text-foreground">{s.value}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Building Amenities</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[
+                  ...(property.buildingDetails?.amenities || []),
+                  property.buildingDetails?.hasParking ? "Parking" : null,
+                  property.buildingDetails?.hasElevator ? "Elevator" : null,
+                  property.buildingDetails?.hasSecurity ? "24/7 Security" : null,
+                ].filter(Boolean).map((a, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-secondary" /> {a}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div>
+            <h2 className="text-xl font-bold mb-4">Available Units ({availableUnits.length})</h2>
+            <div className="space-y-4">
+              {availableUnits.map((unit, i) => (
+                <Card key={unit.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="flex flex-col sm:flex-row gap-4 p-4">
+                    <img src={propertyImages[(i + 2) % propertyImages.length]} alt={unit.unitIdentifier} className="h-24 w-full sm:w-32 rounded-lg object-cover" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground">{unit.unitIdentifier}</h3>
+                      <div className="mt-1 flex items-center gap-3 md:gap-4 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} Beds</span>
+                        <span className="flex items-center gap-1"><Bath className="h-3 w-3" /> {unit.bathrooms} Baths</span>
+                        <span className="flex items-center gap-1"><Maximize className="h-3 w-3" /> {unit.areaSqMeters} m²</span>
+                        <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Floor {unit.floorNumber}</span>
+                      </div>
+                      {unit.amenities && unit.amenities.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {unit.amenities.map((a, j) => (
+                            <Badge key={j} variant="outline" className="text-[10px]">{a}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2">
+                      <div className="text-right">
+                        <span className="text-lg md:text-xl font-bold text-secondary">${unit.rentAmount.toLocaleString()}</span>
+                        <span className="text-xs text-muted-foreground">/mo</span>
+                      </div>
+                      <Link to={`/browse/${unit.id}`}>
+                        <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">VIEW UNIT</Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {availableUnits.length === 0 && (
+                <Card><CardContent className="p-8 text-center text-muted-foreground">No units currently available in this property.</CardContent></Card>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-4">
+          <Card className="border-secondary/20 bg-secondary/5">
+            <CardContent className="p-6 space-y-4">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Starting From</p>
+              <p className="text-3xl font-bold text-secondary">
+                ${availableUnits.length > 0 ? Math.min(...availableUnits.map(u => u.rentAmount)).toLocaleString() : "—"}
+                <span className="text-sm font-normal text-muted-foreground">/month</span>
+              </p>
+              <p className="text-xs text-muted-foreground">{availableUnits.length} unit(s) available</p>
+              <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply}>
+                <MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW
+              </Button>
+              <Button variant="outline" className="w-full" onClick={handleSchedule}>
+                <CalendarCheck className="mr-2 h-4 w-4" /> SCHEDULE A TOUR
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Location</CardTitle></CardHeader>
+            <CardContent>
+              <div className="h-40 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-sm">
+                <MapPin className="h-5 w-5 mr-2" /> Map View
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {property.addressStreet}, {property.addressSubCity}, {property.addressCity}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
