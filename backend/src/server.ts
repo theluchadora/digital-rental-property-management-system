@@ -2,17 +2,14 @@ import "dotenv/config";
 import app from "./app";
 import { initWebSocket } from "./websocket/wsServer";
 import http from "http";
+import { startCronJobs } from "./jobs/cron";
 
 const server = http.createServer(app);
 initWebSocket(server);
-
-server.listen(process.env.PORT || 8080, () => {
-  console.log(`WebSocket Server running on port ${process.env.PORT || 8080}`);
-});
+startCronJobs();
 
 const PORT = process.env.PORT || 8080;
 
-
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

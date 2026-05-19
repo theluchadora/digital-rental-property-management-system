@@ -2,10 +2,12 @@ import { User } from "./user.types";
 import { Property } from "./property.types";
 
 export enum MaintenanceStatus {
-  PENDING = "PENDING",
+  OPEN = "OPEN",
   IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
+  RESOLVED = "RESOLVED",
+  REJECTED = "REJECTED",
   CANCELLED = "CANCELLED",
+  CLOSED = "CLOSED",
 }
 
 export enum MaintenancePriority {

@@ -45,6 +45,7 @@ export const initializePayment = async (req: Request, res: Response) => {
       tx_ref,
     });
   } catch (error: any) {
+    console.error("Error caught in paymentController.ts:", error);
     res.status(500).json({ error: "Payment initialization failed" });
   }
 };
@@ -82,7 +83,7 @@ export const paymentWebhook = async (req: Request, res: Response) => {
 
 // Frontend checks this to verify payment
 export const checkPaymentStatus = async (req: Request, res: Response) => {
-  const { tx_ref } = req.params;
+  const tx_ref = req.params.tx_ref as string;
   
   if (paidTransactions.has(tx_ref)) {
     res.json({ status: 'paid' });
@@ -101,6 +102,7 @@ export const checkPaymentStatus = async (req: Request, res: Response) => {
         res.json({ status: 'pending' });
       }
     } catch {
+    console.error("Error caught in paymentController.ts:", new Error("Unknown error caught"));
       res.json({ status: 'pending' });
     }
   }

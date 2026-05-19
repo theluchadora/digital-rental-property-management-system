@@ -17,6 +17,7 @@ export const getLeaseById = async (
 ): Promise<Lease | null> => {
   return prisma.lease.findUnique({
     where: { id },
+    include: { property: true, tenant: true, owner: true, invoices: true },
   });
 };
 
@@ -24,6 +25,7 @@ export const getLeaseById = async (
 export const getAllLeases = async (): Promise<Lease[]> => {
   return prisma.lease.findMany({
     orderBy: { createdAt: "desc" },
+    include: { property: true, tenant: true, owner: true, invoices: true },
   });
 };
 
@@ -34,6 +36,7 @@ export const getLeasesByTenantId = async (
   return prisma.lease.findMany({
     where: { tenantId },
     orderBy: { createdAt: "desc" },
+    include: { property: true, tenant: true, owner: true, invoices: true },
   });
 };
 
@@ -44,6 +47,7 @@ export const getLeasesByPropertyId = async (
   return prisma.lease.findMany({
     where: { propertyId },
     orderBy: { createdAt: "desc" },
+    include: { property: true, tenant: true, owner: true, invoices: true },
   });
 }
 
@@ -55,6 +59,7 @@ export const getLeasesByOwnerId = async (
   return prisma.lease.findMany({
     where: { ownerId },
     orderBy: { createdAt: "desc" },
+    include: { property: true, tenant: true, owner: true, invoices: true },
   });
 };
 

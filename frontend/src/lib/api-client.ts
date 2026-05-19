@@ -12,9 +12,12 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Redirect to login on 401
+    // Redirect to login on 401, EXCEPT for login/register endpoints where we want to handle the error locally
     if (error.response?.status === 401) {
-      window.location.href = "/login";
+      const isAuthEndpoint = error.config?.url?.includes('/users/login') || error.config?.url?.includes('/users/register');
+      if (!isAuthEndpoint) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

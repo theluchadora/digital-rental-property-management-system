@@ -3,7 +3,7 @@ import * as notificationsService from "./notificationsService";
 import * as invoicesService from "./invoicesService";
 import * as propertiesService from "./propertiesService";
 import { NotificationType } from "@prisma/client";
-import { stat } from "node:fs";
+import * as leaseDocumentsService from "./leaseDocumentsService";
 
 
 
@@ -36,6 +36,105 @@ export const getLeasesByTenantId = async (tenantId: string) => {
 
 export const getLeasesByOwnerId = async (ownerId: string) => {
   return await leasesRepo.getLeasesByOwnerId(ownerId);
+};
+
+export const createLease = async (input: {
+  propertyId: string;
+  tenantId: string;
+  ownerId: string;
+  startDate: Date;
+  endDate: Date;
+  monthlyRent: number;
+  depositAmount?: number;
+  paidEvery: number;
+  latefee: number;
+}) => {
+  const lease = await leasesRepo.createLease({
+    propertyId: input.propertyId,
+    tenantId: input.tenantId,
+    ownerId: input.ownerId,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    monthlyRent: input.monthlyRent as any,
+    depositAmount: input.depositAmount as any,
+    paidEvery: input.paidEvery,
+    latefee: input.latefee,
+    status: "DRAFT",
+    moveInDate: input.startDate,
+    moveOutDate: input.endDate,
+  } as any);
+
+  await notificationsService.createNotification({
+    userId: input.tenantId,
+    type: NotificationType.LEASE,
+    title: "Lease created",
+    content: "A lease has been drafted and awaits signature.",
+    leaseId: lease.id,
+  });
+
+  return lease;
+};
+
+export const addLeaseDocument = async (input: {
+  leaseId: string;
+  fileUrl: string;
+  fileName?: string;
+  documentType?: string;
+  uploadedBy?: string;
+}) => {
+  const doc = await leaseDocumentsService.addLeaseDocument(input);
+  const lease = await leasesRepo.getLeaseById(input.leaseId);
+  if (lease && lease.status === "DRAFT") {
+    await leasesRepo.updateLease(input.leaseId, { status: "ACTIVE" });
+  }
+  return doc;
+};
+
+export const terminateLease = async (
+  leaseId: string,
+  reason: string
+) => {
+  const lease = await leasesRepo.getLeaseById(leaseId);
+  if (!lease) throw new Error("Lease not found");
+
+  const updated = await leasesRepo.updateLease(leaseId, {
+    status: "TERMINATED",
+    terminationReason: reason,
+    terminatedAt: new Date(),
+  } as any);
+
+  await propertiesService.updateProperty(lease.propertyId, { status: "VACANT" });
+
+  await notificationsService.createNotification({
+    userId: lease.tenantId,
+    type: NotificationType.LEASE,
+    title: "Lease terminated",
+    content: reason,
+    leaseId: lease.id,
+  });
+
+  return updated;
+};
+
+export const submitMoveOutNotice = async (
+  leaseId: string,
+  noticeDate: Date,
+  note?: string
+) => {
+  const updated = await leasesRepo.updateLease(leaseId, {
+    moveOutNoticeDate: noticeDate,
+    moveOutNoticeNote: note,
+  } as any);
+
+  await notificationsService.createNotification({
+    userId: updated.ownerId,
+    type: NotificationType.LEASE,
+    title: "Move-out notice",
+    content: "Tenant submitted a move-out notice.",
+    leaseId: updated.id,
+  });
+
+  return updated;
 };
 
 export const startLeaseAgreement = async (

@@ -57,3 +57,31 @@ export const updateProperty = async (
     data,
   });
 };
+
+//* delete property
+export const deleteProperty = async (id: string): Promise<Property> => {
+  return prisma.property.delete({
+    where: { id },
+  });
+};
+
+//* search properties with filters + pagination
+export const searchProperties = async (
+  where: Prisma.PropertyWhereInput,
+  skip: number,
+  take: number
+): Promise<Property[]> => {
+  return prisma.property.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip,
+    take,
+  });
+};
+
+//* count properties for pagination
+export const countProperties = async (
+  where: Prisma.PropertyWhereInput
+): Promise<number> => {
+  return prisma.property.count({ where });
+};

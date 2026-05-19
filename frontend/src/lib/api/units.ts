@@ -13,31 +13,31 @@ export interface UnitsListParams {
 export const unitsApi = {
   // List units with filters
   list: async (params?: UnitsListParams): Promise<ApiResponse<{ units: RentalUnit[] }>> => {
-    const response = await apiClient.get("/api/units", { params });
+    const response = await apiClient.get("/units", { params });
     return response.data;
   },
 
   // Get single unit
   getById: async (id: string): Promise<ApiResponse<{ unit: RentalUnit }>> => {
-    const response = await apiClient.get(`/api/units/${id}`);
+    const response = await apiClient.get(`/units/${id}`);
     return response.data;
   },
 
   // Create unit under property
   create: async (propertyId: string, payload: CreateUnitPayload): Promise<ApiResponse<{ unit: RentalUnit }>> => {
-    const response = await apiClient.post(`/api/properties/${propertyId}/units`, payload);
+    const response = await apiClient.post(`/properties/${propertyId}/units`, payload);
     return response.data;
   },
 
   // Update unit
   update: async (id: string, payload: Partial<CreateUnitPayload>): Promise<ApiResponse<{ unit: RentalUnit }>> => {
-    const response = await apiClient.patch(`/api/units/${id}`, payload);
+    const response = await apiClient.patch(`/units/${id}`, payload);
     return response.data;
   },
 
   // Delete unit
   delete: async (id: string): Promise<ApiResponse<{ success: boolean }>> => {
-    const response = await apiClient.delete(`/api/units/${id}`);
+    const response = await apiClient.delete(`/units/${id}`);
     return response.data;
   },
 };

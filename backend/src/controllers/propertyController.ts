@@ -11,6 +11,7 @@ export const createProperty = async (req: Request & { user?: { id: string , role
     const property = await propertiesService.createProperty({ ownerId, ...req.body });
     res.status(201).json(property);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(400).json({ error: err.message || "Failed to create property" });
   }
 };
@@ -22,15 +23,45 @@ export const getPropertyById = async (req: Request, res: Response) => {
     if (!property) return res.status(404).json({ error: "Property not found" });
     res.json(property);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to get property" });
   }
 };
 
-export const listProperties = async (_req: Request, res: Response) => {
+export const listProperties = async (req: Request, res: Response) => {
   try {
-    const properties = await propertiesService.listProperties();
-    res.json(properties);
+    const {
+      city,
+      type,
+      status,
+      minRent,
+      maxRent,
+      bedrooms,
+      hasUnits,
+      page = "1",
+      limit = "20",
+    } = req.query as Record<string, string>;
+
+    const where: any = {};
+    if (city) where.city = { contains: city, mode: "insensitive" };
+    if (type) where.type = type;
+    if (status) where.status = status;
+    if (hasUnits !== undefined) where.hasUnits = hasUnits === "true";
+    if (bedrooms) where.bedrooms = Number(bedrooms);
+    if (minRent || maxRent) {
+      where.monthlyRent = {};
+      if (minRent) where.monthlyRent.gte = Number(minRent);
+      if (maxRent) where.monthlyRent.lte = Number(maxRent);
+    }
+
+    const result = await propertiesService.searchProperties(
+      where,
+      Number(page),
+      Number(limit)
+    );
+    res.json(result);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list properties" });
   }
 };
@@ -42,6 +73,7 @@ export const getPropertiesByOwner = async (req: Request, res: Response) => {
     const properties = await propertiesService.getPropertiesByOwner(ownerId);
     res.json(properties);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list properties" });
   }
 };
@@ -53,6 +85,7 @@ export const getUnitsUnderProperty = async (req: Request, res: Response) => {
     const units = await propertiesService.getUnitsUnderProperty(propertyId);
     res.json(units);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list units" });
   }
 };
@@ -64,6 +97,7 @@ export const getVacantUnitsUnderProperty = async (req: Request, res: Response) =
     const units = await propertiesService.getVacantUnitsUnderProperty(propertyId);
     res.json(units);
   } catch (err  :any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list units" });
   }
 };
@@ -74,6 +108,7 @@ export const getVacantProperties = async (_req: Request, res: Response) => {
     const properties = await propertiesService.getVacantProperties();
     res.json(properties);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list properties" });
   }
 };
@@ -83,7 +118,18 @@ export const updateProperty = async (req: Request, res: Response) => {
     const updated = await propertiesService.updateProperty(req.params.id as string, req.body);
     res.json(updated);
   } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
     res.status(400).json({ error: err.message || "Failed to update property" });
+  }
+};
+
+export const deleteProperty = async (req: Request, res: Response) => {
+  try {
+    const deleted = await propertiesService.deleteProperty(req.params.id as string);
+    res.json(deleted);
+  } catch (err: any) {
+    console.error("Error caught in propertyController.ts:", err);
+    res.status(400).json({ error: err.message || "Failed to delete property" });
   }
 };
 
@@ -96,4 +142,5 @@ export default {
   getVacantUnitsUnderProperty,
   getVacantProperties,
   updateProperty,
+  deleteProperty,
 };

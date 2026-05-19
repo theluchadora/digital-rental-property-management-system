@@ -27,6 +27,34 @@ export const getInvoicesByUserId = async (
   });
 }
 
+export const getInvoicesByOwnerId = async (
+  ownerId: string
+): Promise<Invoice[]> => {
+  return prisma.invoice.findMany({
+    where: { lease: { ownerId } },
+    orderBy: { createdAt: "desc" },
+  });
+};
+
+export const listInvoices = async (
+  where: Prisma.InvoiceWhereInput,
+  skip: number,
+  take: number
+): Promise<Invoice[]> => {
+  return prisma.invoice.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip,
+    take,
+  });
+};
+
+export const countInvoices = async (
+  where: Prisma.InvoiceWhereInput
+): Promise<number> => {
+  return prisma.invoice.count({ where });
+};
+
 //* Update an invoice by ID
 export const updateInvoice = async (
   id: string,

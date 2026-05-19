@@ -3,6 +3,8 @@ import { Property } from "./property.types";
 import { Invoice } from "./invoice.types";
 
 export enum LeaseStatus {
+  INITIATED = "INITIATED",
+  AWAITINGPAYMENT = "AWAITINGPAYMENT",
   ACTIVE = "ACTIVE",
   DRAFT = "DRAFT",
   EXPIRED = "EXPIRED",
@@ -19,8 +21,14 @@ export interface Lease {
   startDate: Date;
   endDate: Date;
   monthlyRent: number;
+  depositAmount?: number | null;
+  latefee?: number;
   moveInDate: Date;
-  moveOutDate: Date;
+  moveOutDate?: Date | null;
+  moveOutNoticeDate?: Date | null;
+  moveOutNoticeNote?: string | null;
+  terminationReason?: string | null;
+  terminatedAt?: Date | null;
   status: LeaseStatus;
   invoices?: Invoice[];
   createdAt: Date;
@@ -34,8 +42,10 @@ export interface LeaseCreateInput {
   startDate: Date;
   endDate: Date;
   monthlyRent: number;
+  depositAmount?: number;
+  latefee?: number;
   moveInDate: Date;
-  moveOutDate: Date;
+  moveOutDate?: Date;
   status?: LeaseStatus;
 }
 
@@ -44,7 +54,13 @@ export interface LeaseUpdateInput {
   startDate?: Date;
   endDate?: Date;
   monthlyRent?: number;
+  depositAmount?: number;
+  latefee?: number;
   moveInDate?: Date;
   moveOutDate?: Date;
+  moveOutNoticeDate?: Date;
+  moveOutNoticeNote?: string;
+  terminationReason?: string;
+  terminatedAt?: Date;
   status?: LeaseStatus;
 }

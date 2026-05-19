@@ -35,6 +35,7 @@ enum PropertyStatus {
 }
 
 enum LeaseStatus {
+  DRAFT
   INITIATED
   ACTIVE
   AWAITINGPAYMENT
@@ -45,6 +46,7 @@ enum LeaseStatus {
 
 enum InvoiceStatus {
   UNPAID
+  PENDING_REVIEW
   PAID
   OVERDUE
   VOID
@@ -68,13 +70,17 @@ enum NotificationType {
   MESSAGE
   SYSTEM
   LEASE
+  ANNOUNCEMENT
+  INCIDENT
 }
 
 enum MaintenanceStatus {
-  PENDING
+  OPEN
   IN_PROGRESS
-  COMPLETED
+  RESOLVED
+  REJECTED
   CANCELLED
+  CLOSED
 }
 
 enum MaintenancePriority {
@@ -112,6 +118,12 @@ model User {
   maintenanceRequests Maintenance[] // Maintenance requests created by this user
   sentMessages    Message[]      @relation("SenderMessages")
   receivedMessages Message[]     @relation("RecipientMessages")
+  announcements   Announcement[]
+  incidentReports IncidentReport[] @relation("IncidentReporter")
+  incidentReportsAgainst IncidentReport[] @relation("IncidentReportedUser")
+  uploadedLeaseDocuments LeaseDocument[]
+  uploadedMaintenanceEvidence MaintenanceEvidence[]
+  uploadedIncidentEvidence IncidentEvidence[]
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -204,6 +216,7 @@ model Property {
   // ---------- LEASES & REQUESTS ----------
   leases      Lease[]
   maintenance Maintenance[] @relation("PropertyMaintenance")
+  announcements Announcement[]
 
   
   // ---------- TIMESTAMPS ----------
@@ -257,18 +270,24 @@ model Lease {
   startDate   DateTime
   endDate     DateTime
   monthlyRent Decimal    @db.Decimal(10, 2)
+  depositAmount Decimal? @db.Decimal(10, 2)
   status      LeaseStatus @default(INITIATED)
   latefee    Int
   
 
   //moving in and out
   moveInDate DateTime
-  moveOutDate DateTime
+  moveOutDate DateTime?
+  moveOutNoticeDate DateTime?
+  moveOutNoticeNote String?
+  terminationReason String?
+  terminatedAt DateTime?
   
 
   
   // Invoices
   invoices    Invoice[]
+  documents   LeaseDocument[]
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -278,6 +297,26 @@ model Lease {
   @@index([status])
   @@index([startDate, endDate])
   @@map("leases")
+}
+
+model LeaseDocument {
+  id          String   @id @default(uuid()) @db.Uuid
+  leaseId     String   @db.Uuid
+  lease       Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  fileUrl     String
+  fileName    String?
+  documentType String?
+
+  uploadedBy  String?  @db.Uuid
+  uploadedByUser User? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  uploadedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leaseId])
+  @@index([uploadedBy])
+  @@map("lease_documents")
 }
 
 
@@ -429,7 +468,7 @@ model Maintenance {
   title       String
   description String?
   priority    MaintenancePriority @default(MEDIUM)
-  status      MaintenanceStatus   @default(PENDING)
+  status      MaintenanceStatus   @default(OPEN)
   
   scheduledDate DateTime?
   completedDate DateTime?
@@ -438,6 +477,8 @@ model Maintenance {
   actualCost    Decimal?          @db.Decimal(10, 2)
   
   notes       String?
+
+  evidence    MaintenanceEvidence[]
   
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
@@ -447,6 +488,94 @@ model Maintenance {
   @@index([priority])
   @@index([createdBy])
   @@map("maintenance_requests")
+}
+
+model MaintenanceEvidence {
+  id            String   @id @default(uuid()) @db.Uuid
+  maintenanceId String   @db.Uuid
+  maintenance   Maintenance @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
+
+  fileUrl       String
+  fileName      String?
+
+  uploadedBy    String?  @db.Uuid
+  uploadedByUser User?   @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  uploadedAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([maintenanceId])
+  @@index([uploadedBy])
+  @@map("maintenance_evidence")
+}
+
+model Announcement {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerId     String   @db.Uuid
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  propertyId  String?  @db.Uuid
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  title       String
+  content     String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([propertyId])
+  @@map("announcements")
+}
+
+model IncidentReport {
+  id            String   @id @default(uuid()) @db.Uuid
+  reporterId    String?  @db.Uuid
+  reporter      User?    @relation("IncidentReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  reportedUserId String? @db.Uuid
+  reportedUser  User?    @relation("IncidentReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  reportType   String
+  incidentType String
+  urgency      String
+  description  String
+  location     String
+  incidentDate DateTime
+  incidentTime String?
+  witnesses    String?
+  againstPerson String?
+  isAnonymous  Boolean @default(false)
+
+  status       String @default("OPEN")
+  adminNote    String?
+  resolvedBy   String? @db.Uuid
+  resolvedAt   DateTime?
+
+  evidence     IncidentEvidence[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([status])
+  @@map("incident_reports")
+}
+
+model IncidentEvidence {
+  id          String   @id @default(uuid()) @db.Uuid
+  reportId    String   @db.Uuid
+  report      IncidentReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  fileUrl     String
+  fileName    String?
+  uploadedBy  String?  @db.Uuid
+  uploadedByUser User? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  uploadedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([reportId])
+  @@index([uploadedBy])
+  @@map("incident_evidence")
 }
 
 

@@ -26,5 +26,8 @@ router.get("/:id", propertyController.getPropertyById);
 // Update a property
 router.patch("/:id", authenticateToken, propertyController.updateProperty);
 
+// Delete a property
+router.delete("/:id", authenticateToken, propertyController.deleteProperty);
+
 export default router;
 

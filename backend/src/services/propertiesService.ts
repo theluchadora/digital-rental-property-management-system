@@ -114,6 +114,30 @@ export const updateProperty = async (
   return sanitize(updated);
 };
 
+export const deleteProperty = async (id: string): Promise<SafeProperty> => {
+  const deleted = await propertiesRepo.deleteProperty(id);
+  return sanitize(deleted);
+};
+
+export const searchProperties = async (
+  where: Prisma.PropertyWhereInput,
+  page: number,
+  limit: number
+) => {
+  const skip = (page - 1) * limit;
+  const [items, total] = await Promise.all([
+    propertiesRepo.searchProperties(where, skip, limit),
+    propertiesRepo.countProperties(where),
+  ]);
+
+  return {
+    data: items.map(sanitize),
+    total,
+    page,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+};
+
 export default {
   createProperty,
   getPropertyById,
@@ -123,4 +147,6 @@ export default {
   getVacantUnitsUnderProperty,
   getVacantProperties,
   updateProperty,
+  deleteProperty,
+  searchProperties,
 };

@@ -3,6 +3,7 @@ import * as leasesRepo from "../repositories/leasesRepository";
 import * as usersRepo from "../repositories/usersRepository";
 import { Invoice as DbInvoice, NotificationType } from "@prisma/client";
 import * as notificationsService from "./notificationsService";
+import { Prisma } from "@prisma/client";
 import {
   InvoiceCreateInput,
   InvoiceUpdateInput,
@@ -88,12 +89,79 @@ export const listInvoicesByTenant = async (
   return enriched;
 };
 
+export const listInvoices = async (
+  where: Prisma.InvoiceWhereInput,
+  page: number,
+  limit: number
+) => {
+  const skip = (page - 1) * limit;
+  const [items, total] = await Promise.all([
+    invoiceRepo.listInvoices(where, skip, limit),
+    invoiceRepo.countInvoices(where),
+  ]);
+  const enriched = await Promise.all(items.map((i) => sanitize(i)));
+
+  return {
+    data: enriched,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
+};
+
 export const updateInvoice = async (
   id: string,
   data: InvoiceUpdateInput
 ): Promise<InvoiceWithOwner> => {
   const updated = await invoiceRepo.updateInvoice(id, data as any);
   return sanitize(updated);
+};
+
+export const reviewInvoiceStatus = async (
+  id: string,
+  data: { status: "PAID" | "UNPAID"; reviewNote?: string; reviewerId?: string }
+) => {
+  const updated = await invoiceRepo.updateInvoice(id, {
+    status: data.status,
+    reviewNote: data.reviewNote,
+    reviewedBy: data.reviewerId ? { connect: { id: data.reviewerId } } : undefined,
+    reviewedAt: new Date(),
+    paidAt: data.status === "PAID" ? new Date() : undefined,
+  } as any);
+
+  return sanitize(updated);
+};
+
+export const generateMonthlyInvoices = async (billingMonth: Date) => {
+  const leases = await leasesRepo.getAllLeases();
+  let generatedCount = 0;
+  let skippedCount = 0;
+
+  for (const lease of leases) {
+    if (lease.status !== "ACTIVE") {
+      skippedCount += 1;
+      continue;
+    }
+
+    const normalizedMonth = new Date(billingMonth);
+    normalizedMonth.setDate(1);
+
+    try {
+      await invoiceRepo.createInvoice({
+        lease: { connect: { id: lease.id } } as any,
+        tenant: { connect: { id: lease.tenantId } } as any,
+        billingMonth: normalizedMonth,
+        amountDue: lease.monthlyRent,
+        dueDate: new Date(normalizedMonth.getFullYear(), normalizedMonth.getMonth(), 15),
+      } as any);
+      generatedCount += 1;
+    } catch {
+    console.error("Error caught in invoicesService.ts:", new Error("Unknown error caught"));
+      skippedCount += 1;
+    }
+  }
+
+  return { generatedCount, skippedCount };
 };
 
 export const deleteInvoice = async (id: string): Promise<InvoiceWithOwner> => {

@@ -17,3 +17,13 @@ export const authenticateToken = (req: any, res: Response, next: NextFunction) =
     res.status(403).json({ error: "Forbidden: Invalid or expired token" });
   }
 };
+
+export const authorizeRoles = (...roles: string[]) => {
+  return (req: any, res: Response, next: NextFunction) => {
+    const role = req.user?.role;
+    if (!role || !roles.includes(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    next();
+  };
+};

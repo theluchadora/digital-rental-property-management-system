@@ -14,6 +14,7 @@ export const getMyNotifications = async (req: Request & { user?: { id: string } 
     const notifications = await notificationsService.getNotificationsByUserId(userId);
     res.json(notifications);
   } catch (err: any) {
+    console.error("Error caught in notificationController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to get notifications" });
   }
 };
@@ -34,6 +35,7 @@ export const markNotificationAsRead = async (req: Request & { user?: { id: strin
 
     res.json(updatedNotification);
   } catch (err: any) {
+    console.error("Error caught in notificationController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to mark notification as read" });
   }
 };

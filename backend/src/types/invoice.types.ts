@@ -3,6 +3,7 @@ import { Lease } from "./lease.types";
 
 export enum InvoiceStatus {
   UNPAID = "UNPAID",
+  PENDING_REVIEW = "PENDING_REVIEW",
   PAID = "PAID",
   OVERDUE = "OVERDUE",
   VOID = "VOID",

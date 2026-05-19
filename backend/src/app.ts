@@ -13,6 +13,13 @@ import userRoutes from "./routes/userRoutes";
 import propertyRoutes from "./routes/propertyRoutes";
 import photoRoutes from "./routes/photoRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
+import leaseRoutes from "./routes/leaseRoutes";
+import invoiceRoutes from "./routes/invoiceRoutes";
+import maintenanceRoutes from "./routes/maintenanceRoutes";
+import announcementsRoutes from "./routes/announcementsRoutes";
+import incidentsRoutes from "./routes/incidentsRoutes";
+import unitsRoutes from "./routes/unitsRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
 
 const app = express();
 // Allow credentials (cookies) to be sent from the browser
@@ -54,11 +61,22 @@ router.use("/photos", photoRoutes);
 // Mount notification routes under /api/notifications
 router.use("/notifications", notificationRoutes);
 
+// Lease, invoice, maintenance, announcements, incidents
+router.use("/leases", leaseRoutes);
+router.use("/invoices", invoiceRoutes);
+router.use("/maintenance-requests", maintenanceRoutes);
+router.use("/announcements", announcementsRoutes);
+router.use("/incidents", incidentsRoutes);
+router.use("/units", unitsRoutes);
+router.use("/dashboard", dashboardRoutes);
+
 // payment routes
 router.post('/payments/initialize', initializePayment);
 router.post('/payments/webhook', paymentWebhook);  
 router.get('/payments/verify/:tx_ref', checkPaymentStatus);  
 
 app.use("/api", router);
+app.use("/api/v1", router);
+app.use("/api/v1/api", router);
 
 export default app;

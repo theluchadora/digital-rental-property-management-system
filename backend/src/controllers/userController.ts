@@ -19,6 +19,7 @@ export const register = async (req: Request, res: Response) => {
     }); 
     res.status(201).json(user);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(400).json({ "Registration failed": err.message || "Failed to register user" });
   }
 };
@@ -27,7 +28,10 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
     const user = await usersService.authenticate(email, password);
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) {
+      console.warn(`Failed login attempt for email: ${email} - Invalid credentials`);
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
     const token = jwt.sign({ id: (user as any).id, role: (user as any).role }, process.env.JWT_SECRET as string, {
       expiresIn: "1d",
@@ -42,6 +46,7 @@ export const login = async (req: Request, res: Response) => {
 
     return res.json({ message: "Login successful", user });
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Login failed" });
   }
 };
@@ -54,6 +59,7 @@ export const getMe = async (req: any, res: Response) => {
     const user = await usersService.getUser(id);
     res.json(user);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to fetch user" });
   }
 };
@@ -63,6 +69,7 @@ export const list = async (_req: Request, res: Response) => {
     const users = await usersService.listUsers();
     res.json(users);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list users" });
   }
 };
@@ -73,6 +80,7 @@ export const getById = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json(user);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to get user" });
   }
 };
@@ -82,6 +90,7 @@ export const update = async (req: Request & { user?: { id?: string } }, res: Res
     const updated = await usersService.updateUser(req.user?.id as string, req.body);
     res.json(updated);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(400).json({ error: err.message || "Update failed" });
   }
 };
@@ -91,6 +100,7 @@ export const remove = async (req: Request & { user?: { id?: string } }, res: Res
     const deleted = await usersService.removeUser(req.user?.id as string);
     res.json(deleted);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Delete failed" });
   }
 };
@@ -101,6 +111,7 @@ export const search = async (req: Request, res: Response) => {
     const results = await usersService.searchUsers(q);
     res.json(results);
   } catch (err: any) {
+    console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Search failed" });
   }
 };

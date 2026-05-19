@@ -20,6 +20,7 @@ export const uploadPhoto = async (req: Request & { user?: { id: string, role: st
     const photo = await photosService.uploadPhoto(propertyId, url);
     res.status(201).json(photo);
   } catch (err: any) {
+    console.error("Error caught in photoController.ts:", err);
     res.status(400).json({ error: err.message });
   }
 };
@@ -30,6 +31,7 @@ export const getPropertyPhotos = async (req: Request, res: Response) => {
     const photos = await photosService.getPhotosByProperty(propertyId);
     res.json(photos);
   } catch (err: any) {
+    console.error("Error caught in photoController.ts:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -48,6 +50,7 @@ export const deletePhoto = async (req: Request & { user?: { id: string, role: st
     await photosService.deletePhoto(photoId);
     res.status(204).send();
   } catch (err: any) {
+    console.error("Error caught in photoController.ts:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -72,6 +75,7 @@ export const updatePhoto = async (req: Request & { user?: { id: string, role: st
     const updated = await photosService.updatePhoto(photoId, url);
     res.json(updated);
   } catch (err: any) {
+    console.error("Error caught in photoController.ts:", err);
     res.status(400).json({ error: err.message });
   }
 };
