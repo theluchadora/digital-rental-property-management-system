@@ -53,6 +53,14 @@ export default function LeasesPage() {
   const totalPages = Math.max(1, Math.ceil(filteredLeases.length / ITEMS_PER_PAGE));
   const paginatedLeases = filteredLeases.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+  const annualContractValue = leases.filter(l => l.status === "ACTIVE").reduce((acc, l) => acc + (l.monthlyRent * 12), 0);
+  const activeLeasesCount = leases.filter(l => l.status === "ACTIVE").length;
+  const expiringSoonCount = leases.filter(l => {
+    if (l.status !== "ACTIVE") return false;
+    const daysUntilExp = (new Date(l.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    return daysUntilExp > 0 && daysUntilExp <= 60;
+  }).length;
+
   const exportCSV = () => {
     const header = "Lease ID,Tenant,Unit,Monthly Rent,Start,End,Status\n";
     const rows = filteredLeases.map(l =>
@@ -86,10 +94,10 @@ export default function LeasesPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "ANNUAL CONTRACT VALUE", value: "$428,950.00" },
-          { label: "ACTIVE LEASES", value: "124" },
-          { label: "OCCUPANCY RATE", value: "98%", change: "+2.4%", color: "text-secondary" },
-          { label: "EXPIRING SOON", value: "12", color: "text-destructive" },
+          { label: "ANNUAL CONTRACT VALUE", value: `$${annualContractValue.toLocaleString()}.00` },
+          { label: "ACTIVE LEASES", value: activeLeasesCount.toString() },
+          { label: "OCCUPANCY RATE", value: "—", color: "text-secondary" },
+          { label: "EXPIRING SOON", value: expiringSoonCount.toString(), color: "text-destructive" },
         ].map((s, i) => (
           <Card key={i}>
             <CardContent className="p-4 md:p-5">

@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { mockProperties, mockUnits, propertyImages } from "@/data/mockData";
+import { propertyImages } from "@/data/mockData";
 import { MapPin, ArrowLeft, Bed, Bath, Maximize, Building2, CheckCircle, MessageSquare, CalendarCheck } from "lucide-react";
 import PhotoGalleryDialog from "@/components/PhotoGalleryDialog";
 import { useToast } from "@/hooks/use-toast";

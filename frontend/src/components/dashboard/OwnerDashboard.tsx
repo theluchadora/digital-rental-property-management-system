@@ -5,23 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { propertyImages } from "@/data/mockData";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { dashboardApi } from "@/lib/api/dashboard";
 
-const propertyPerformance = [
-  { name: "The Sterling Heights", location: "Lower East Side, NY", revenue: "$142,500", change: "+4.2%", occupancy: 100, image: propertyImages[3] },
-  { name: "Vanguard Plaza", location: "Financial District, SF", revenue: "$98,200", change: "-1.8%", occupancy: 88, image: propertyImages[1] },
-  { name: "Marble Arch Lofts", location: "Mayfair, London", revenue: "$215,000", change: "+12.4%", occupancy: 94, image: propertyImages[2] },
-];
+const propertyPerformance: any[] = [];
 
-const allActivity = [
-  { icon: CreditCard, title: "Invoice Paid: Unit 402B", desc: "Payment of $4,250 received.", time: "14 MIN AGO", color: "text-secondary" },
-  { icon: Wrench, title: "Maintenance Request", desc: "Water heater malfunction.", time: "2 HRS AGO", color: "text-destructive", badge: "HIGH PRIORITY" },
-  { icon: FileText, title: "New Lease Executed", desc: "Sarah J. signed for Suite 12.", time: "5 HRS AGO", color: "text-foreground" },
-  { icon: Mail, title: "Inquiry: Unit Availability", desc: "External query re: penthouse.", time: "YESTERDAY", color: "text-muted-foreground" },
-];
+const allActivity: any[] = [];
 
 function downloadCSV(data: typeof propertyPerformance, filename: string) {
   const header = "Asset Name,Location,Revenue (MTD),Change,Occupancy\n";
@@ -228,7 +218,6 @@ export default function OwnerDashboard() {
       {/* CTA Banner */}
       {showBanner && (
         <div className="mt-6 md:mt-8 relative overflow-hidden rounded-xl">
-          <img src={propertyImages[4]} alt="Insights" className="h-48 md:h-64 w-full object-cover" loading="lazy" />
           <div className="absolute inset-0 bg-primary/75" />
           <div className="absolute bottom-0 left-0 p-4 md:p-8">
             <h3 className="text-lg md:text-2xl font-bold italic text-primary-foreground">Optimizing Portfolio Yield<br className="hidden md:block" /> Through Data-Driven Insights</h3>

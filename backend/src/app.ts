@@ -20,6 +20,7 @@ import announcementsRoutes from "./routes/announcementsRoutes";
 import incidentsRoutes from "./routes/incidentsRoutes";
 import unitsRoutes from "./routes/unitsRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
+import messagesRoutes from "./routes/messagesRoutes";
 
 const app = express();
 // Allow credentials (cookies) to be sent from the browser
@@ -69,6 +70,7 @@ router.use("/announcements", announcementsRoutes);
 router.use("/incidents", incidentsRoutes);
 router.use("/units", unitsRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/messages", messagesRoutes);
 
 // payment routes
 router.post('/payments/initialize', initializePayment);

@@ -1,3 +1,5 @@
+import { appConfig } from "./app-config";
+
 type ListenerCallback = (data: unknown) => void;
 const listeners = new Map<string, Set<ListenerCallback>>();
 
@@ -13,7 +15,18 @@ export function connectWebSocket(userId: string) {
   disconnectWebSocket();
   currentUserId = userId;
 
-  const wsUrl = `ws://localhost:3000/ws?userId=${encodeURIComponent(userId)}`;
+  let wsUrl = "";
+  const apiBaseUrl = appConfig.apiBaseUrl;
+  
+  if (apiBaseUrl.startsWith("http")) {
+    const url = new URL(apiBaseUrl);
+    const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+    wsUrl = `${wsProtocol}//${url.host}/ws?userId=${encodeURIComponent(userId)}`;
+  } else {
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    wsUrl = `${wsProtocol}//${window.location.host}/ws?userId=${encodeURIComponent(userId)}`;
+  }
+
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {

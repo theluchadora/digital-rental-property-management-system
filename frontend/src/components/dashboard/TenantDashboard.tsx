@@ -9,12 +9,12 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { announcementsApi } from "@/lib/api/announcements";
 import { dashboardApi } from "@/lib/api/dashboard";
-import { mockAnnouncements, mockLeases } from "@/data/mockData";
+
 import { Announcement } from "@/types/api";
 
 export default function TenantDashboard() {
   const { user } = useAuth();
-  const activeLease = mockLeases.find(l => l.status === "ACTIVE") || mockLeases[0];
+  const activeLease = null as any; // TODO: fetch active lease
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
@@ -40,8 +40,7 @@ export default function TenantDashboard() {
         setAnnouncements(res.data?.data || []);
       })
       .catch(() => {
-        // Fallback to mock data if backend fails
-        setAnnouncements(mockAnnouncements);
+        setAnnouncements([]);
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -134,11 +133,11 @@ export default function TenantDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { label: "Property", value: "The Glass Pavilion Residences" },
-              { label: "Unit", value: "Sky Loft 2B" },
-              { label: "Monthly Rent", value: "$2,800.00" },
-              { label: "Security Deposit", value: "$2,800.00" },
-              { label: "Lease Term", value: "Mar 15, 2024 — Mar 14, 2025" },
+              { label: "Property", value: activeLease?.unit?.property?.title || "—" },
+              { label: "Unit", value: activeLease?.unit?.unitIdentifier || "—" },
+              { label: "Monthly Rent", value: activeLease ? `$${activeLease.monthlyRent.toLocaleString()}` : "—" },
+              { label: "Security Deposit", value: activeLease?.depositAmount ? `$${activeLease.depositAmount.toLocaleString()}` : "—" },
+              { label: "Lease Term", value: activeLease ? `${new Date(activeLease.startDate).toLocaleDateString()} — ${new Date(activeLease.endDate).toLocaleDateString()}` : "—" },
             ].map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{item.label}</span>
@@ -149,11 +148,17 @@ export default function TenantDashboard() {
               <span className="text-muted-foreground">Status</span>
               <Badge className="bg-secondary/10 text-secondary">ACTIVE</Badge>
             </div>
-            <Link to={`/leases/${activeLease.id}`}>
-              <Button className="w-full mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90" size="sm">
-                View Full Lease <ArrowRight className="ml-2 h-4 w-4" />
+            {activeLease ? (
+              <Link to={`/leases/${activeLease.id}`}>
+                <Button className="w-full mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90" size="sm">
+                  View Full Lease <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            ) : (
+              <Button disabled className="w-full mt-4" size="sm">
+                No Active Lease
               </Button>
-            </Link>
+            )}
           </CardContent>
         </Card>
 

@@ -9,16 +9,32 @@ const users = new Map<string, WebSocket>();
 export const initWebSocket = (server: http.Server) => {
   const wss = new WebSocketServer({ server });
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
     console.log("WS connected");
 
-    ws.on("message", (message) => {
-      const data: any = JSON.parse(message.toString());
+    // Register user via query param if available
+    try {
+      const url = new URL(req.url || "", "ws://localhost");
+      const userId = url.searchParams.get("userId");
+      if (userId) {
+        users.set(userId, ws);
+        console.log("User registered via URL query:", userId);
+      }
+    } catch (err) {
+      console.error("Failed to parse user registration query:", err);
+    }
 
-      // REGISTER USER
-      if (data.type === "REGISTER") {
-        users.set(data.userId, ws);
-        console.log("User registered:", data.userId);
+    ws.on("message", (message) => {
+      try {
+        const data: any = JSON.parse(message.toString());
+
+        // REGISTER USER
+        if (data.type === "REGISTER") {
+          users.set(data.userId, ws);
+          console.log("User registered via message:", data.userId);
+        }
+      } catch (err) {
+        console.error("Failed to parse WS message:", err);
       }
     });
 
@@ -26,6 +42,7 @@ export const initWebSocket = (server: http.Server) => {
       for (const [userId, socket] of users.entries()) {
         if (socket === ws) {
           users.delete(userId);
+          console.log("User disconnected:", userId);
           break;
         }
       }

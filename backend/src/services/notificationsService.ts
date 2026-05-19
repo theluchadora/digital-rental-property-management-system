@@ -8,8 +8,27 @@ import {
 
 type SafeNotification = NotificationModel;
 
-const sanitize = (notification: DbNotification): SafeNotification => {
-  return notification;
+const sanitize = (notification: DbNotification): any => {
+  let entityId: string | null = null;
+  let entityType: string | null = null;
+
+  if (notification.invoiceId) {
+    entityId = notification.invoiceId;
+    entityType = "INVOICE";
+  } else if (notification.leaseId) {
+    entityId = notification.leaseId;
+    entityType = "LEASE";
+  } else if (notification.messageId) {
+    entityId = notification.messageId;
+    entityType = "MESSAGE";
+  }
+
+  return {
+    ...notification,
+    message: notification.content,
+    entityId,
+    entityType,
+  };
 };
 
 export const createNotification = async (

@@ -233,66 +233,66 @@ export interface RefreshTokenResponse {
 //   evidence?: MaintenanceEvidence[];
 // }
 
-// // ===== Messaging =====
-// export interface Message {
-//   id: string;
-//   senderId: string;
-//   receiverId: string;
-//   subject: string;
-//   content: string;
-//   conversationId: string;
-//   readAt?: string | null;
-//   createdAt: string;
-//   updatedAt: string;
-//   sender?: User;
-//   receiver?: User;
-// }
+// ===== Messaging =====
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  subject: string;
+  content: string;
+  conversationId: string;
+  readAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sender?: User;
+  receiver?: User;
+}
 
-// export interface Conversation {
-//   id: string;
-//   participantAId: string;
-//   participantBId: string;
-//   propertyId?: string | null;
-//   lastMessageId?: string | null;
-//   participantA: User;
-//   participantB: User;
-//   lastMessage?: Message;
-//   property?: PropertySummary;
-//   createdAt: string;
-//   updatedAt: string;
-// }
+export interface Conversation {
+  id: string;
+  participantAId: string;
+  participantBId: string;
+  propertyId?: string | null;
+  lastMessageId?: string | null;
+  participantA: User;
+  participantB: User;
+  lastMessage?: Message;
+  property?: Property;
+  createdAt: string;
+  updatedAt: string;
+}
 
-// export interface Announcement {
-//   id: string;
-//   ownerId: string;
-//   propertyId?: string | null;
-//   title: string;
-//   content: string;
-//   createdAt: string;
-//   updatedAt: string;
-//   owner?: User;
-//   property?: PropertySummary;
-// }
+export interface Announcement {
+  id: string;
+  ownerId: string;
+  propertyId?: string | null;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  owner?: User;
+  property?: Property;
+}
 
-// export interface Notification {
-//   id: string;
-//   userId: string;
-//   type: NotificationType;
-//   message: string;
-//   entityType?: string | null;
-//   entityId?: string | null;
-//   isRead: boolean;
-//   createdAt: string;
-//   updatedAt: string;
-// }
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  message: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
-// // ===== Pagination =====
-// export interface PaginatedResponse<T> {
-//   data: T[];
-//   total: number;
-//   page: number;
-//   totalPages: number;
-// }
+// ===== Pagination =====
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
 
 
 

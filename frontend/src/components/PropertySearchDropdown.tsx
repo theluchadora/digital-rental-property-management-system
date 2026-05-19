@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Search, Building2, Home } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { mockProperties, mockUnits } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function PropertySearchDropdown() {
@@ -18,22 +17,9 @@ export default function PropertySearchDropdown() {
 
   // Filter properties and units
   const q = query.toLowerCase().trim();
-  const filteredProperties = q
-    ? mockProperties.filter(p =>
-        p.title.toLowerCase().includes(q) ||
-        p.addressCity.toLowerCase().includes(q) ||
-        p.addressStreet?.toLowerCase().includes(q) ||
-        p.addressSubCity?.toLowerCase().includes(q)
-      )
-    : [];
+  const filteredProperties: any[] = [];
 
-  const filteredUnits = q
-    ? mockUnits.filter(u =>
-        u.unitIdentifier.toLowerCase().includes(q) ||
-        u.property?.title?.toLowerCase().includes(q) ||
-        u.property?.addressCity?.toLowerCase().includes(q)
-      ).slice(0, 5)
-    : [];
+  const filteredUnits: any[] = [];
 
   const hasResults = filteredProperties.length > 0 || filteredUnits.length > 0;
 
