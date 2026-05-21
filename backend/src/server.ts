@@ -9,7 +9,7 @@ const server = http.createServer(app);
 initWebSocket(server);
 startCronJobs();
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.BACKEND_PORT || process.env.PORT || 8080;
 
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "Server started");

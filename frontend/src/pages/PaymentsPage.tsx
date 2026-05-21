@@ -29,6 +29,7 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -46,33 +47,37 @@ export default function PaymentsPage() {
 
   
   const handlePayWithChapa = async (invoice: Invoice) => {
-  try {
-    const response = await chapaApi.initializePayment({
-      amount: invoice.amountDue.toFixed(2),
-      email: user?.email || 'tenant@example.com',
-      first_name: user?.firstName || 'Tenant',
-      last_name: user?.lastName || 'User',
-    });
-
-    if (response.checkout_url) {
-      // Save tx_ref
-      localStorage.setItem(`paying_invoice_${invoice.id}`, response.tx_ref);
-      
-      // Open Chapa in NEW TAB
-      window.open(response.checkout_url, '_blank');
-      
-      toast({
-        title: "Chapa opened in new tab",
-        description: "Complete payment, then come back here.",
+    setPayingInvoiceId(invoice.id);
+    try {
+      const response = await chapaApi.initializePayment({
+        amount: invoice.amountDue.toFixed(2),
+        email: user?.email || 'tenant@example.com',
+        first_name: user?.firstName || 'Tenant',
+        last_name: user?.lastName || 'User',
       });
-      
-      // Start checking payment status
-      checkPaymentLoop(invoice.id, response.tx_ref);
+
+      if (response.checkout_url) {
+        // Save tx_ref
+        localStorage.setItem(`paying_invoice_${invoice.id}`, response.tx_ref);
+        
+        // Open Chapa in NEW TAB
+        window.open(response.checkout_url, '_blank');
+        
+        toast({
+          title: "Chapa opened in new tab",
+          description: "Complete payment, then come back here.",
+        });
+        
+        // Start checking payment status
+        checkPaymentLoop(invoice.id, response.tx_ref);
+      } else {
+        setPayingInvoiceId(null);
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Payment failed", variant: "destructive" });
+      setPayingInvoiceId(null);
     }
-  } catch (error) {
-    toast({ title: "Error", description: "Payment failed", variant: "destructive" });
-  }
-};
+  };
 
 // Keep checking until paid
 const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
@@ -172,8 +177,8 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
           </Select>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b text-left text-xs uppercase text-muted-foreground">
                   <th className="p-4">Invoice</th><th className="p-4">Billing Month</th><th className="p-4">Amount</th><th className="p-4">Due Date</th><th className="p-4">Status</th><th className="p-4">Action</th>
@@ -189,8 +194,8 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
                     <td className="p-4"><Badge className={statusColors[inv.status]}>{inv.status}</Badge></td>
                     <td className="p-4">
                       {(inv.status === "UNPAID" || inv.status === "OVERDUE") && !isOwner ? (
-                        <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={() => handlePayWithChapa(inv)}>
-                          Pay with Chapa
+                        <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={() => handlePayWithChapa(inv)} disabled={payingInvoiceId === inv.id}>
+                          {payingInvoiceId === inv.id ? "PROCESSING..." : "Pay with Chapa"}
                         </Button>
                       ) : inv.status === "PAID" ? (
                         <span className="text-success text-sm flex items-center gap-1"><CheckCircle className="h-4 w-4" /> Paid</span>

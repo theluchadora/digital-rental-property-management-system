@@ -47,11 +47,13 @@ export default function TenantPropertyDetailPage() {
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [isApplying, setIsApplying] = useState(false);
 
   const openGallery = (index: number) => { setGalleryIndex(index); setGalleryOpen(true); };
 
   const handleApply = () => {
     if (!property) return;
+    setIsApplying(true);
     leasesApi.apply(property.id)
       .then(() => {
         toast({
@@ -62,8 +64,10 @@ export default function TenantPropertyDetailPage() {
       })
       .catch((err) => {
         console.error("Failed to apply:", err);
-        toast({ title: "Apply failed", description: "Please try again.", variant: "destructive" });
-      });
+        const errorMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Please try again.";
+        toast({ title: "Apply failed", description: errorMsg, variant: "destructive" });
+      })
+      .finally(() => setIsApplying(false));
   };
 
   const handleSchedule = () => {
@@ -287,8 +291,8 @@ export default function TenantPropertyDetailPage() {
               <p className="text-xs text-muted-foreground">
                 {property.hasUnits ? `${availableUnits.length} unit(s) available` : "Whole property rental"}
               </p>
-              <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply}>
-                <MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW
+              <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply} disabled={isApplying}>
+                {isApplying ? "APPLYING..." : <><MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW</>}
               </Button>
               <Button variant="outline" className="w-full" onClick={handleSchedule}>
                 <CalendarCheck className="mr-2 h-4 w-4" /> MESSAGE OWNER

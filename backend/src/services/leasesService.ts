@@ -224,6 +224,14 @@ export const initiateLease = async (propertyId: string , tenantId: string) => {
     if (property.monthlyRent == null) throw new Error("Property monthly rent not set");
     if (property.status !== "VACANT") throw new Error("Property is not vacant");
 
+    const existingLeases = await leasesRepo.getLeasesByTenantId(tenantId);
+    const hasActiveOrPending = existingLeases.some(
+      l => l.propertyId === propertyId && ["INITIATED", "AWAITINGPAYMENT", "ACTIVE"].includes(l.status)
+    );
+    if (hasActiveOrPending) {
+       throw new Error("You have already applied for this property");
+    }
+
     const monthlyRent = Number(property.monthlyRent);
 
 

@@ -1,14 +1,15 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter, Download, ChevronLeft, ChevronRight, Plus, MessageSquare } from "lucide-react";
+import { Filter, Download, ChevronLeft, ChevronRight, Plus, MessageSquare, CreditCard } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { leasesApi } from "@/lib/api/leases";
+import { chapaApi } from "@/lib/api/chapa";
 import type { Lease } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -32,6 +33,8 @@ export default function LeasesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loadingDecision, setLoadingDecision] = useState<{ id: string; type: 'accept' | 'decline' | null }>({ id: "", type: null });
+  const [payingLeaseId, setPayingLeaseId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadLeases() {
@@ -76,6 +79,32 @@ export default function LeasesPage() {
     a.click();
     URL.revokeObjectURL(url);
     toast({ title: "Leases Exported" });
+  };
+
+  const handlePayLease = async (lease: Lease) => {
+    const invoice = lease.invoices?.find(inv => inv.status === "UNPAID" || inv.status === "OVERDUE");
+    if (!invoice) {
+      toast({ title: "No invoice found", description: "No unpaid invoice for this lease.", variant: "destructive" });
+      return;
+    }
+    setPayingLeaseId(lease.id);
+    try {
+      const response = await chapaApi.initializePayment({
+        amount: invoice.amountDue.toFixed(2),
+        email: user?.email || 'tenant@example.com',
+        first_name: user?.firstName || 'Tenant',
+        last_name: user?.lastName || 'User',
+      });
+      if (response.checkout_url) {
+        localStorage.setItem(`paying_invoice_${invoice.id}`, response.tx_ref);
+        window.open(response.checkout_url, '_blank');
+        toast({ title: "Chapa opened", description: "Complete your payment in the new tab." });
+      }
+    } catch {
+      toast({ title: "Payment error", description: "Could not initiate payment.", variant: "destructive" });
+    } finally {
+      setPayingLeaseId(null);
+    }
   };
 
   return (
@@ -195,7 +224,9 @@ export default function LeasesPage() {
                               variant="ghost"
                               size="sm"
                               className="text-secondary text-xs"
+                              disabled={loadingDecision.id === lease.id}
                               onClick={async () => {
+                                setLoadingDecision({ id: lease.id, type: 'accept' });
                                 try {
                                   await leasesApi.decide(lease.id, true);
                                   setLeases((prev) =>
@@ -205,16 +236,20 @@ export default function LeasesPage() {
                                 } catch (err) {
                                   console.error("Failed to accept request:", err);
                                   toast({ title: "Failed", description: "Could not accept request", variant: "destructive" });
+                                } finally {
+                                  setLoadingDecision({ id: "", type: null });
                                 }
                               }}
                             >
-                              Accept
+                              {loadingDecision.id === lease.id && loadingDecision.type === 'accept' ? "..." : "Accept"}
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               className="text-destructive text-xs"
+                              disabled={loadingDecision.id === lease.id}
                               onClick={async () => {
+                                setLoadingDecision({ id: lease.id, type: 'decline' });
                                 try {
                                   await leasesApi.decide(lease.id, false);
                                   setLeases((prev) =>
@@ -224,12 +259,25 @@ export default function LeasesPage() {
                                 } catch (err) {
                                   console.error("Failed to decline request:", err);
                                   toast({ title: "Failed", description: "Could not decline request", variant: "destructive" });
+                                } finally {
+                                  setLoadingDecision({ id: "", type: null });
                                 }
                               }}
                             >
-                              Decline
+                              {loadingDecision.id === lease.id && loadingDecision.type === 'decline' ? "..." : "Decline"}
                             </Button>
                           </>
+                        )}
+                        {!isOwner && lease.status === "AWAITINGPAYMENT" && (
+                          <Button
+                            size="sm"
+                            className="bg-secondary text-secondary-foreground hover:bg-secondary/90 text-xs"
+                            disabled={payingLeaseId === lease.id}
+                            onClick={() => handlePayLease(lease)}
+                          >
+                            <CreditCard className="mr-1 h-3 w-3" />
+                            {payingLeaseId === lease.id ? "..." : "Pay Now"}
+                          </Button>
                         )}
                         {lease.tenantId && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-secondary" onClick={() => navigate(`/messages?userId=${lease.tenantId}`)}>

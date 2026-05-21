@@ -295,6 +295,56 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+export interface Invoice {
+  id: string;
+  leaseId: string;
+  billingMonth: string;
+  amountDue: number;
+  dueDate: string;
+  status: InvoiceStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeaseDocument {
+  id: string;
+  leaseId: string;
+  fileUrl: string;
+  fileName?: string;
+  documentType?: string;
+  uploadedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Lease {
+  id: string;
+  propertyId: string;
+  tenantId: string;
+  ownerId: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  depositAmount?: number;
+  paidEvery: number;
+  latefee: number;
+  status: LeaseStatus;
+  tenantEmail?: string;
+  moveInDate?: string;
+  moveOutDate?: string;
+  terminationReason?: string;
+  terminatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  property?: Property;
+  tenant?: User;
+  owner?: User;
+  invoices?: Invoice[];
+  documents?: LeaseDocument[];
+  // legacy
+  unit?: { unitIdentifier?: string };
+}
+
 
 
 
