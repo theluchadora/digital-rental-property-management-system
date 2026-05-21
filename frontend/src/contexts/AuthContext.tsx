@@ -3,6 +3,7 @@ import { authApi, RegisterPayload } from "@/lib/api/auth";
 import { authStorage } from "@/lib/auth-storage";
 import type { User } from "@/types/api";
 import { getApiErrorMessage } from "@/lib/api-error-handler";
+import { connectWebSocket, disconnectWebSocket } from "@/lib/websocket";
 
 interface AuthContextType {
   user: User | null;
@@ -41,6 +42,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      connectWebSocket(user.id);
+    } else {
+      disconnectWebSocket();
+    }
+  }, [user?.id]);
 
   const login = async (email: string, password: string) => {
     try {

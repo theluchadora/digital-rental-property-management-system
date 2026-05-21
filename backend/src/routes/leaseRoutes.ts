@@ -5,8 +5,10 @@ import { authenticateToken, authorizeRoles } from "../auth/authMiddleware";
 const router = Router();
 
 router.get("/", authenticateToken, leaseController.list);
+router.post("/apply", authenticateToken, authorizeRoles("TENANT"), leaseController.apply);
 router.get("/:id", authenticateToken, leaseController.getById);
 router.post("/", authenticateToken, authorizeRoles("OWNER"), leaseController.create);
+router.post("/:id/decision", authenticateToken, authorizeRoles("OWNER"), leaseController.decide);
 router.post("/:id/documents", authenticateToken, authorizeRoles("OWNER"), leaseController.uploadDocument);
 router.get("/documents/:id/download", authenticateToken, leaseController.downloadDocument);
 router.post("/:id/terminate", authenticateToken, leaseController.terminate);

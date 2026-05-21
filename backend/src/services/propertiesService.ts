@@ -36,7 +36,7 @@ export const createProperty = async (
 
 export const getPropertyById = async (id: string): Promise<SafeProperty | null> => {
   const prop = await propertiesRepo.getPropertyById(id);
-  const photos = await photosService.getPhotosByProperty(id);
+  const photos = (await photosService.getPhotosByProperty(id)).map(p => p.url);
   if (prop) {
     return { ...sanitize(prop), photos };
   }
@@ -47,7 +47,7 @@ export const listProperties = async (): Promise<SafeProperty[]> => {
   const props = await propertiesRepo.getAllProperties();
   const propsWithPhotos = await Promise.all(
     props.map(async (prop) => {
-      const photos = await photosService.getPhotosByProperty(prop.id);
+      const photos = (await photosService.getPhotosByProperty(prop.id)).map(p => p.url);
       return { ...sanitize(prop), photos };
     })
   );
@@ -67,7 +67,7 @@ export const getUnitsUnderProperty = async (propertyId: string): Promise<SafePro
   const units = await propertiesRepo.getUnitsByPropertyId(propertyId);
   const unitsWithPhotos = await Promise.all(
     units.map(async (unit) => {
-      const photos = await photosService.getPhotosByProperty(unit.id);
+      const photos = (await photosService.getPhotosByProperty(unit.id)).map(p => p.url);
       return { ...sanitize(unit), photos };
     })
   );
@@ -80,7 +80,7 @@ export const getVacantUnitsUnderProperty = async (propertyId: string): Promise<S
   const units = await propertiesRepo.getUnitsByPropertyId(propertyId);
   const unitsWithPhotos = await Promise.all(
     units.filter((unit) => unit.status === "VACANT").map(async (unit) => {
-      const photos = await photosService.getPhotosByProperty(unit.id);
+      const photos = (await photosService.getPhotosByProperty(unit.id)).map(p => p.url);
       return { ...sanitize(unit), photos };
     })
   );
@@ -93,7 +93,7 @@ export const getVacantProperties = async (): Promise<SafeProperty[]> => {
   const vacantProps = props.filter((prop) => prop.status === "VACANT" && prop.type !== "UNIT");
   const propsWithPhotos = await Promise.all(
     vacantProps.map(async (prop) => {
-      const photos = await photosService.getPhotosByProperty(prop.id);
+      const photos = (await photosService.getPhotosByProperty(prop.id)).map(p => p.url);
       return { ...sanitize(prop), photos };
     })
   );

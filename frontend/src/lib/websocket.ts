@@ -90,3 +90,11 @@ export function subscribeToEvent(type: "NEW_MESSAGE" | "NEW_NOTIFICATION", callb
     listeners.get(type)?.delete(callback);
   };
 }
+
+export function sendWebSocketMessage(type: string, payload: any) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type, payload }));
+    return true;
+  }
+  return false;
+}

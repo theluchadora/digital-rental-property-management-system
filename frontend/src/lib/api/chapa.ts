@@ -6,8 +6,10 @@ export const chapaApi = {
     return response.data;
   },
 
-  verifyTransaction: async (txRef: string) => {
-    const response = await apiClient.get(`/payments/verify/${txRef}`);
+  verifyTransaction: async (txRef: string, invoiceId?: string) => {
+    const response = await apiClient.get(`/payments/verify/${txRef}`, {
+      params: invoiceId ? { invoiceId } : undefined,
+    });
     return {
       status: response.data.status === 'paid' ? 'success' : 'failed',
       data: response.data,

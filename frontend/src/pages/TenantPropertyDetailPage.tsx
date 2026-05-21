@@ -8,6 +8,7 @@ import PhotoGalleryDialog from "@/components/PhotoGalleryDialog";
 import { useToast } from "@/hooks/use-toast";
 import { propertiesApi } from "@/lib/api/properties";
 import { unitsApi } from "@/lib/api/units";
+import { leasesApi } from "@/lib/api/leases";
 import type { Property } from "@/types/api";
 
 export default function TenantPropertyDetailPage() {
@@ -24,12 +25,10 @@ export default function TenantPropertyDetailPage() {
       try {
         try {
           const unitResponse = await unitsApi.getById(listingId);
-          console.log("Tenant listing (unit) response:", unitResponse);
           setProperty(unitResponse.unit || null);
           return;
         } catch (unitErr) {
           const response = await propertiesApi.getById(listingId);
-          console.log("Tenant listing (property) response:", response);
           setProperty(response || null);
         }
       } catch (err) {
@@ -53,13 +52,23 @@ export default function TenantPropertyDetailPage() {
 
   const handleApply = () => {
     if (!property) return;
-    toast({ title: "Redirecting to Messages", description: "Send a message to the property owner to apply." });
-    navigate(property.ownerId ? `/messages?userId=${property.ownerId}` : "/messages");
+    leasesApi.apply(property.id)
+      .then(() => {
+        toast({
+          title: "Application sent",
+          description: "The owner has been notified and will respond with an invoice if accepted.",
+        });
+        navigate("/leases");
+      })
+      .catch((err) => {
+        console.error("Failed to apply:", err);
+        toast({ title: "Apply failed", description: "Please try again.", variant: "destructive" });
+      });
   };
 
   const handleSchedule = () => {
     if (!property) return;
-    toast({ title: "Redirecting to Messages", description: "Send a message to schedule a viewing." });
+    toast({ title: "Redirecting to Messages", description: "Chat with the owner about this listing." });
     navigate(property.ownerId ? `/messages?userId=${property.ownerId}` : "/messages");
   };
 
@@ -282,7 +291,7 @@ export default function TenantPropertyDetailPage() {
                 <MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW
               </Button>
               <Button variant="outline" className="w-full" onClick={handleSchedule}>
-                <CalendarCheck className="mr-2 h-4 w-4" /> SCHEDULE A TOUR
+                <CalendarCheck className="mr-2 h-4 w-4" /> MESSAGE OWNER
               </Button>
             </CardContent>
           </Card>

@@ -32,6 +32,12 @@ export const initWebSocket = (server: http.Server) => {
         if (data.type === "REGISTER") {
           users.set(data.userId, ws);
           console.log("User registered via message:", data.userId);
+        } else if (data.type === "SEND_MESSAGE") {
+          const { senderId, receiverId, subject, content, tempId } = data.payload;
+          // Dynamically require to avoid circular dependency
+          const messagesService = require("../services/messagesService");
+          messagesService.sendMessage(senderId, receiverId, subject, content, tempId)
+            .catch((err: any) => console.error("Failed to send WS message", err));
         }
       } catch (err) {
         console.error("Failed to parse WS message:", err);

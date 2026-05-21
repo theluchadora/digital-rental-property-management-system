@@ -5,7 +5,7 @@ export type PropertyType = "BUILDING" | "UNIT" | "HOUSE" | "VEHICLE";
 export type PropertyStatus = "VACANT" | "OCCUPIED" | "MAINTENANCE";
 export type FuelType = "PETROL" | "DIESEL" | "ELECTRIC" | "HYBRID";
 export type UnitStatus = "VACANT" | "OCCUPIED" | "MAINTENANCE" | "UNAVAILABLE";
-export type LeaseStatus = "DRAFT" | "ACTIVE" | "TERMINATED" | "EXPIRED";
+export type LeaseStatus = "INITIATED" | "AWAITINGPAYMENT" | "DRAFT" | "ACTIVE" | "TERMINATED" | "EXPIRED";
 export type InvoiceStatus = "UNPAID" | "PENDING_REVIEW" | "PAID" | "OVERDUE";
 export type MaintenanceStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "OWNER_REJECTED" | "TENANT_REJECTED" | "CANCELLED" | "CLOSED";
 export type MaintenancePriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -246,6 +246,7 @@ export interface Message {
   updatedAt: string;
   sender?: User;
   receiver?: User;
+  isOptimistic?: boolean;
 }
 
 export interface Conversation {

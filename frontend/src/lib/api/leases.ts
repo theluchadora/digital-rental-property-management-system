@@ -36,6 +36,12 @@ export const leasesApi = {
   create: (data: CreateLeasePayload) =>
     apiClient.post<{ lease: Lease }>("/leases", data),
 
+  apply: (propertyId: string) =>
+    apiClient.post<{ message: string }>("/leases/apply", { propertyId }),
+
+  decide: (leaseId: string, accept: boolean) =>
+    apiClient.post<{ lease: Lease }>(`/leases/${leaseId}/decision`, { accept }),
+
   /** Upload signed lease document — activates the lease on first signed doc */
   uploadDocument: (leaseId: string, file: File, documentType?: string) => {
     const formData = new FormData();

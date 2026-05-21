@@ -161,7 +161,7 @@ export const approveLease = async (leaseId: string , verdict: boolean) => {
     if (!lease) throw new Error("Lease not found");
 
     if (!verdict) {
-      await leasesRepo.updateLease(leaseId, { status: "TERMINATED" });
+      const updated = await leasesRepo.updateLease(leaseId, { status: "TERMINATED" });
       await propertiesService.updateProperty(lease.propertyId, { status: "VACANT" });
 
       // Notify tenant that lease has been rejected
@@ -172,6 +172,8 @@ export const approveLease = async (leaseId: string , verdict: boolean) => {
         content: `Your lease for property ${lease.propertyId} has been rejected.`,
         leaseId: lease.id,
       });
+
+      return updated;
     } else{
 // approved by the owner, now we set lease to awaiting payment and generate initial invoice for the lease
 
@@ -180,13 +182,13 @@ export const approveLease = async (leaseId: string , verdict: boolean) => {
             const property = await propertiesService.getPropertyById(lease.propertyId);
             if (!property) throw new Error("Property not found");
             
-            await leasesRepo.updateLease(leaseId, { status: "AWAITINGPAYMENT" });
+            const updated = await leasesRepo.updateLease(leaseId, { status: "AWAITINGPAYMENT" });
             // Notify tenant of new lease
             await notificationsService.createNotification({
             userId: lease.tenantId,
             type: NotificationType.LEASE,
-            title: "New Lease Created",
-            content: `A new lease has been created for property ${property.title}.`,
+            title: "Lease approved",
+            content: `Your lease for ${property.title} is approved. Please complete payment to confirm.`,
             leaseId: leaseId,
 
 
@@ -207,8 +209,7 @@ export const approveLease = async (leaseId: string , verdict: boolean) => {
             ],
         });
 
-
-        return lease;
+        return updated;
 
     }
 
@@ -240,8 +241,6 @@ export const initiateLease = async (propertyId: string , tenantId: string) => {
     moveOutDate: null,
     updatedAt: new Date(),
   } as any);
-   
-  await propertiesService.updateProperty(propertyId, { status: "OCCUPIED" }); // Set property status to pending until lease is approved
 
   await notificationsService.createNotification({
     userId: property.ownerId,

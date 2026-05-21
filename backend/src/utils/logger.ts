@@ -25,9 +25,9 @@ export const httpLogger = pinoHttp({
     return "info";
   },
   customSuccessMessage: (req, res) =>
-    `${req.method} ${req.originalUrl} ${res.statusCode}`,
+    `${req.method} ${req.url} ${res.statusCode}`,
   customErrorMessage: (req, res, err) =>
-    `${req.method} ${req.originalUrl} ${res.statusCode} - ${err.message}`,
+    `${req.method} ${req.url} ${res.statusCode} - ${err.message}`,
   serializers: {
     req: (req) => ({ method: req.method, url: req.url }),
     res: (res) => ({ statusCode: res.statusCode }),

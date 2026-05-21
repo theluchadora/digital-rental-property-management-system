@@ -77,7 +77,23 @@ export default function MessagesPage() {
   }, [urlUserId, conversations, selectedConvId]);
 
   useEffect(() => {
-    const unsubscribe = subscribeToEvent("NEW_MESSAGE", (msg: Message) => {
+    const unsubscribe = subscribeToEvent("NEW_MESSAGE", (rawMsg: any) => {
+      const msg = rawMsg as Message & { tempId?: string };
+      if (msg && (msg.senderId === otherUserId || msg.receiverId === otherUserId)) {
+        queryClient.setQueryData(["messages", otherUserId], (old: any) => {
+          if (!old || !old.data || !old.data.data) return old;
+          if (msg.tempId) {
+             const idx = old.data.data.findIndex((m: Message) => m.id === msg.tempId);
+             if (idx !== -1) {
+               const newData = [...old.data.data];
+               newData[idx] = msg;
+               return { ...old, data: { ...old.data, data: newData } };
+             }
+          }
+          if (old.data.data.some((m: Message) => m.id === msg.id)) return old;
+          return { ...old, data: { ...old.data, data: [msg, ...old.data.data] } };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["messages", otherUserId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
 
@@ -101,12 +117,12 @@ export default function MessagesPage() {
   // Mutations
   const sendMessageMutation = useMutation({
     mutationFn: messagesApi.send,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["messages", otherUserId] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    },
     onError: () => {
       toast({ title: "Failed to send", description: "Could not send message", variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["messages", otherUserId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
     }
   });
 
@@ -137,11 +153,43 @@ export default function MessagesPage() {
         content = `📎 [Attachment: ${attachedFile.name}](${fileUrl})\n${content}`;
       }
 
-      await sendMessageMutation.mutateAsync({
+      const tempId = `opt-${Date.now()}`;
+      const optimisticMsg: Message = {
+        id: tempId,
+        senderId: user?.id || "",
+        receiverId: otherUserId,
+        subject: "Direct Message",
+        content,
+        conversationId: selectedConvId || "temp",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sender: user || undefined,
+        isOptimistic: true,
+      };
+
+      queryClient.setQueryData(["messages", otherUserId], (old: any) => {
+        if (!old || !old.data || !old.data.data) return old;
+        return { ...old, data: { ...old.data, data: [optimisticMsg, ...old.data.data] } };
+      });
+
+      // Try sending via WebSocket first
+      const { sendWebSocketMessage } = await import("@/lib/websocket");
+      const sentViaWs = sendWebSocketMessage("SEND_MESSAGE", {
+        tempId,
+        senderId: user?.id,
         receiverId: otherUserId,
         subject: "Direct Message",
         content,
       });
+
+      if (!sentViaWs) {
+        // Fallback to REST if WS is not ready
+        await sendMessageMutation.mutateAsync({
+          receiverId: otherUserId,
+          subject: "Direct Message",
+          content,
+        });
+      }
 
       setNewMessage("");
       setAttachedFile(null);
@@ -253,11 +301,12 @@ export default function MessagesPage() {
                         {msg.sender?.firstName?.[0] || "?"}{msg.sender?.lastName?.[0] || "?"}
                       </div>
                     )}
-                    <div className={`max-w-[80%] md:max-w-md rounded-lg p-3 md:p-4 ${isSent ? "bg-secondary text-secondary-foreground" : "bg-muted text-foreground"}`}>
+                    <div className={`max-w-[80%] md:max-w-md rounded-lg p-3 md:p-4 ${isSent ? "bg-secondary text-secondary-foreground" : "bg-muted text-foreground"} ${msg.isOptimistic ? "opacity-70" : ""}`}>
                       <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                      <p className={`mt-2 text-right text-[10px] ${isSent ? "text-secondary-foreground/70" : "text-muted-foreground"}`}>
-                        {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
+                      <div className={`mt-2 flex items-center justify-end gap-1 text-[10px] ${isSent ? "text-secondary-foreground/70" : "text-muted-foreground"}`}>
+                        {msg.isOptimistic && <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></span>}
+                        <span>{new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
                     </div>
                   </div>
                 );

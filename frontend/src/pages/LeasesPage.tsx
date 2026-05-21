@@ -12,6 +12,8 @@ import { leasesApi } from "@/lib/api/leases";
 import type { Lease } from "@/types/api";
 
 const statusColors: Record<string, string> = {
+  INITIATED: "bg-warning/10 text-warning border-warning/30",
+  AWAITINGPAYMENT: "bg-warning/10 text-warning border-warning/30",
   ACTIVE: "bg-secondary/10 text-secondary border-secondary/30",
   DRAFT: "bg-muted text-muted-foreground border-border",
   EXPIRED: "bg-destructive/10 text-destructive border-destructive/30",
@@ -125,6 +127,8 @@ export default function LeasesPage() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="INITIATED">Initiated</SelectItem>
+                    <SelectItem value="AWAITINGPAYMENT">Awaiting Payment</SelectItem>
                     <SelectItem value="ACTIVE">Active</SelectItem>
                     <SelectItem value="DRAFT">Draft</SelectItem>
                     <SelectItem value="EXPIRED">Expired</SelectItem>
@@ -185,6 +189,48 @@ export default function LeasesPage() {
                         <Link to={`/leases/${lease.id}`}>
                           <Button variant="ghost" size="sm" className="text-secondary text-xs">View</Button>
                         </Link>
+                        {isOwner && lease.status === "INITIATED" && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-secondary text-xs"
+                              onClick={async () => {
+                                try {
+                                  await leasesApi.decide(lease.id, true);
+                                  setLeases((prev) =>
+                                    prev.map((l) => (l.id === lease.id ? { ...l, status: "AWAITINGPAYMENT" as const } : l))
+                                  );
+                                  toast({ title: "Request accepted", description: "Invoice sent to tenant." });
+                                } catch (err) {
+                                  console.error("Failed to accept request:", err);
+                                  toast({ title: "Failed", description: "Could not accept request", variant: "destructive" });
+                                }
+                              }}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive text-xs"
+                              onClick={async () => {
+                                try {
+                                  await leasesApi.decide(lease.id, false);
+                                  setLeases((prev) =>
+                                    prev.map((l) => (l.id === lease.id ? { ...l, status: "TERMINATED" as const } : l))
+                                  );
+                                  toast({ title: "Request declined" });
+                                } catch (err) {
+                                  console.error("Failed to decline request:", err);
+                                  toast({ title: "Failed", description: "Could not decline request", variant: "destructive" });
+                                }
+                              }}
+                            >
+                              Decline
+                            </Button>
+                          </>
+                        )}
                         {lease.tenantId && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-secondary" onClick={() => navigate(`/messages?userId=${lease.tenantId}`)}>
                             <MessageSquare className="h-4 w-4" />

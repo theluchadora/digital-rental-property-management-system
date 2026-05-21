@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, ChevronLeft, ChevronRight, Eye, Bell, CheckCircle } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { chapaApi } from "@/lib/api/chapa";
+import { invoicesApi } from "@/lib/api/invoices";
 import type { Invoice } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -16,13 +17,6 @@ const statusColors: Record<string, string> = {
   UNPAID: "bg-muted text-muted-foreground",
 };
 
-const MOCK_INVOICES: Invoice[] = [
-  { id: "inv-test001", billingMonth: "2024-05-01", dueDate: "2024-05-15", amountDue: 15000, status: "UNPAID", leaseId: "lease-001", receipts: [] },
-  { id: "inv-test002", billingMonth: "2024-06-01", dueDate: "2024-06-15", amountDue: 15000, status: "UNPAID", leaseId: "lease-001", receipts: [] },
-  { id: "inv-test003", billingMonth: "2024-04-01", dueDate: "2024-04-15", amountDue: 15000, status: "OVERDUE", leaseId: "lease-001", receipts: [] },
-  { id: "inv-test004", billingMonth: "2024-03-01", dueDate: "2024-03-15", amountDue: 15000, status: "PAID", leaseId: "lease-001", receipts: [] },
-  { id: "inv-test005", billingMonth: "2024-02-01", dueDate: "2024-02-15", amountDue: 15000, status: "PAID", leaseId: "lease-001", receipts: [] },
-];
 
 const ITEMS_PER_PAGE = 5;
 
@@ -31,25 +25,27 @@ export default function PaymentsPage() {
   const { toast } = useToast();
   const isOwner = user?.role === "OWNER";
   
-  const [invoices, setInvoices] = useState<Invoice[]>(MOCK_INVOICES);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
 
-  const loadInvoices = () => {
-    if (statusFilter === "all") {
-      setInvoices(MOCK_INVOICES);
-    } else {
-      setInvoices(MOCK_INVOICES.filter(inv => inv.status.toLowerCase() === statusFilter.toLowerCase()));
-    }
-  };
-
   useEffect(() => {
+    const loadInvoices = async () => {
+      try {
+        const response = await invoicesApi.list({
+          status: statusFilter === "all" ? undefined : statusFilter.toUpperCase(),
+        });
+        setInvoices(response.data.data || []);
+      } catch (err) {
+        console.error("Failed to load invoices:", err);
+      }
+    };
     loadInvoices();
   }, [statusFilter]);
 
   
-const handlePayWithChapa = async (invoice: Invoice) => {
+  const handlePayWithChapa = async (invoice: Invoice) => {
   try {
     const response = await chapaApi.initializePayment({
       amount: invoice.amountDue.toFixed(2),
@@ -82,7 +78,7 @@ const handlePayWithChapa = async (invoice: Invoice) => {
 const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
   const check = async () => {
     try {
-      const result = await chapaApi.verifyTransaction(txRef);
+      const result = await chapaApi.verifyTransaction(txRef, invoiceId);
       
       if (result.status === 'success') {
         // Update invoice
@@ -107,16 +103,13 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
   // ✅ CHECK PAYMENT STATUS ON RETURN
   useEffect(() => {
     const checkReturningPayments = async () => {
-      for (const inv of MOCK_INVOICES) {
+      for (const inv of invoices) {
         const txRef = localStorage.getItem(`paying_invoice_${inv.id}`);
         if (txRef && inv.status !== 'PAID') {
           try {
-            const result = await chapaApi.verifyTransaction(txRef);
+            const result = await chapaApi.verifyTransaction(txRef, inv.id);
             if (result.status === 'success') {
-              MOCK_INVOICES.forEach(i => {
-                if (i.id === inv.id) i.status = "PAID";
-              });
-              setInvoices([...MOCK_INVOICES]);
+              setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, status: "PAID" as const } : i));
               localStorage.removeItem(`paying_invoice_${inv.id}`);
               toast({ title: "Payment Successful! ✅", description: `${inv.id} is now PAID.` });
             }
@@ -128,16 +121,16 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
     };
     
     checkReturningPayments();
-  }, []);
+  }, [invoices]);
 
   const filteredInvoices = invoices;
   const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE));
   const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  const unpaidCount = MOCK_INVOICES.filter(i => i.status === "UNPAID").length;
-  const overdueCount = MOCK_INVOICES.filter(i => i.status === "OVERDUE").length;
-  const paidCount = MOCK_INVOICES.filter(i => i.status === "PAID").length;
-  const totalCount = MOCK_INVOICES.length;
+  const unpaidCount = invoices.filter(i => i.status === "UNPAID").length;
+  const overdueCount = invoices.filter(i => i.status === "OVERDUE").length;
+  const paidCount = invoices.filter(i => i.status === "PAID").length;
+  const totalCount = invoices.length;
   const collectionRate = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
 
   return (
@@ -149,7 +142,6 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
           </h1>
           <p className="text-sm text-muted-foreground">
             {isOwner ? "PAYMENT OVERVIEW" : "YOUR INVOICES"}
-            <span className="ml-2 text-yellow-500 font-semibold">🧪 TEST MODE</span>
           </p>
         </div>
         {isOwner && (

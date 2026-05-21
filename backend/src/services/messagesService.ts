@@ -8,7 +8,8 @@ export const sendMessage = async (
   senderId: string,
   receiverId: string,
   subject: string,
-  content: string
+  content: string,
+  tempId?: string
 ): Promise<Message> => {
   // Create message in DB
   const message = await messagesRepository.createMessage({
@@ -32,10 +33,16 @@ export const sendMessage = async (
     messageId: message.id,
   });
 
-  // Send message live via WebSocket
+  // Send message live via WebSocket to receiver
   sendToUser(receiverId, {
     type: "NEW_MESSAGE",
-    data: message,
+    data: { ...message, tempId },
+  });
+
+  // Send message live via WebSocket to sender (for instant UI update and tempId replacement)
+  sendToUser(senderId, {
+    type: "NEW_MESSAGE",
+    data: { ...message, tempId },
   });
 
   // Send notification live via WebSocket

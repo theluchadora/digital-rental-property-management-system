@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import axios from "axios";
 import crypto from "crypto";
+import * as invoicesService from "../services/invoicesService";
+import * as leasesRepo from "../repositories/leasesRepository";
+import * as propertiesService from "../services/propertiesService";
 
 const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY || '';
 const CHAPA_API_URL = "https://api.chapa.co/v1/transaction";
@@ -84,8 +87,20 @@ export const paymentWebhook = async (req: Request, res: Response) => {
 // Frontend checks this to verify payment
 export const checkPaymentStatus = async (req: Request, res: Response) => {
   const tx_ref = req.params.tx_ref as string;
+  const invoiceId = (req.query.invoiceId as string) || undefined;
   
   if (paidTransactions.has(tx_ref)) {
+    if (invoiceId) {
+      const invoice = await invoicesService.updateInvoice(invoiceId, {
+        status: "PAID",
+        paidAt: new Date(),
+      } as any);
+      const lease = await leasesRepo.getLeaseById(invoice.leaseId);
+      if (lease) {
+        await leasesRepo.updateLease(lease.id, { status: "ACTIVE" } as any);
+        await propertiesService.updateProperty(lease.propertyId, { status: "OCCUPIED" });
+      }
+    }
     res.json({ status: 'paid' });
   } else {
     // Double check with Chapa
@@ -97,6 +112,17 @@ export const checkPaymentStatus = async (req: Request, res: Response) => {
       
       if (response.data.status === 'success') {
         paidTransactions.add(tx_ref);
+        if (invoiceId) {
+          const invoice = await invoicesService.updateInvoice(invoiceId, {
+            status: "PAID",
+            paidAt: new Date(),
+          } as any);
+          const lease = await leasesRepo.getLeaseById(invoice.leaseId);
+          if (lease) {
+            await leasesRepo.updateLease(lease.id, { status: "ACTIVE" } as any);
+            await propertiesService.updateProperty(lease.propertyId, { status: "OCCUPIED" });
+          }
+        }
         res.json({ status: 'paid' });
       } else {
         res.json({ status: 'pending' });

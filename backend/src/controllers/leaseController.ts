@@ -29,6 +29,14 @@ const moveOutSchema = z.object({
 	note: z.string().optional(),
 });
 
+const applySchema = z.object({
+	propertyId: z.string(),
+});
+
+const decisionSchema = z.object({
+	accept: z.boolean(),
+});
+
 export const list = async (req: Request & { user?: { id: string; role: string } }, res: Response) => {
 	try {
 		const { status, page = "1", limit = "20" } = req.query as Record<string, string>;
@@ -57,6 +65,20 @@ export const list = async (req: Request & { user?: { id: string; role: string } 
 	} catch (err: any) {
     console.error("Error caught in leaseController.ts:", err);
 		res.status(500).json({ error: err.message || "Failed to list leases" });
+	}
+};
+
+export const apply = async (req: Request & { user?: { id: string; role: string } }, res: Response) => {
+	try {
+		const body = applySchema.parse(req.body);
+		const tenantId = req.user?.id;
+		if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
+
+		await leasesService.initiateLease(body.propertyId, tenantId);
+		res.status(201).json({ message: "Lease request submitted" });
+	} catch (err: any) {
+		console.error("Error caught in leaseController.ts:", err);
+		res.status(400).json({ error: err.message || "Failed to submit lease request" });
 	}
 };
 
@@ -173,5 +195,16 @@ export const removeTenant = async (req: Request, res: Response) => {
 	} catch (err: any) {
     console.error("Error caught in leaseController.ts:", err);
 		res.status(400).json({ error: err.message || "Failed to remove tenant" });
+	}
+};
+
+export const decide = async (req: Request & { user?: { id: string; role: string } }, res: Response) => {
+	try {
+		const body = decisionSchema.parse(req.body);
+		const lease = await leasesService.approveLease(req.params.id as string, body.accept);
+		res.json({ lease });
+	} catch (err: any) {
+		console.error("Error caught in leaseController.ts:", err);
+		res.status(400).json({ error: err.message || "Failed to update lease request" });
 	}
 };
