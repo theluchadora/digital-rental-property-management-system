@@ -27,15 +27,7 @@ export default function UnitDetailPage() {
       setIsLoading(true);
       try {
         const unitResponse = await propertiesApi.getById(unitId);
-        let unitData: Property | null = null;
-        
-        if (unitResponse.data?.property) {
-          unitData = unitResponse.data.property;
-        } else if (unitResponse.data?.id) {
-          unitData = unitResponse.data;
-        } else if (unitResponse?.id) {
-          unitData = unitResponse;
-        }
+        const unitData: Property | null = unitResponse.data || null;
         
         if (unitData) {
           setUnit(unitData);
@@ -43,14 +35,7 @@ export default function UnitDetailPage() {
           // Load parent property if exists
           if (unitData.parentId) {
             const parentResponse = await propertiesApi.getById(unitData.parentId);
-            let parentData: Property | null = null;
-            if (parentResponse.data?.property) {
-              parentData = parentResponse.data.property;
-            } else if (parentResponse.data?.id) {
-              parentData = parentResponse.data;
-            } else if (parentResponse?.id) {
-              parentData = parentResponse;
-            }
+            const parentData: Property | null = parentResponse.data || null;
             setParentProperty(parentData);
           }
         }

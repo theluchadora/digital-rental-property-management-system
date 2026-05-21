@@ -62,7 +62,7 @@ export default function PropertySearchDropdown() {
                   onClick={() => {
                     setOpen(false);
                     setQuery("");
-                    navigate(isOwner ? `/properties/${p.id}` : `/browse/property/${p.id}`);
+                    navigate(isOwner ? `/properties/${p.id}` : `/browse/${p.id}`);
                   }}
                 >
                   <Building2 className="h-4 w-4 text-secondary shrink-0" />

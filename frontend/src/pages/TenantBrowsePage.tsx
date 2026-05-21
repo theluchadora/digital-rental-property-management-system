@@ -4,15 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bed, Bath, Maximize, Map, Filter, X, Loader2 } from "lucide-react";
+import { Bed, Bath, Maximize, Filter, X, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { unitsApi } from "@/lib/api/units";
-import type { RentalUnit } from "@/types/api";
+import type { Property } from "@/types/api";
 
 export default function TenantBrowsePage() {
-  const [units, setUnits] = useState<RentalUnit[]>([]);
+  const [units, setUnits] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [location, setLocation] = useState("all");
   const [bedrooms, setBedrooms] = useState("all");
@@ -41,7 +40,7 @@ export default function TenantBrowsePage() {
           bedrooms: (bedrooms !== "all" && bedrooms !== "3+") ? Number(bedrooms) : undefined,
           status: "VACANT",
         });
-        setUnits(response.data.units || []);
+        setUnits(response.data || []);
       } catch (err) {
         console.error("Failed to load units:", err);
       } finally {
@@ -52,7 +51,7 @@ export default function TenantBrowsePage() {
   }, [location, bedrooms, minRent, maxRent]);
 
   const cities = useMemo(() => {
-    const set = new Set(units.map(u => u.property?.addressCity).filter(Boolean));
+    const set = new Set(units.map(u => u.city).filter(Boolean));
     return Array.from(set) as string[];
   }, [units]);
 
@@ -62,16 +61,16 @@ export default function TenantBrowsePage() {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(u =>
-        u.unitIdentifier?.toLowerCase().includes(q) ||
-        u.property?.title?.toLowerCase().includes(q) ||
-        u.property?.addressCity?.toLowerCase().includes(q)
+        u.unitNumber?.toLowerCase().includes(q) ||
+        u.title?.toLowerCase().includes(q) ||
+        u.city?.toLowerCase().includes(q)
       );
     }
 
     if (sortBy === "price-desc") {
-      result.sort((a, b) => b.rentAmount - a.rentAmount);
+      result.sort((a, b) => (b.monthlyRent || 0) - (a.monthlyRent || 0));
     } else if (sortBy === "price-asc") {
-      result.sort((a, b) => a.rentAmount - b.rentAmount);
+      result.sort((a, b) => (a.monthlyRent || 0) - (b.monthlyRent || 0));
     }
 
     return result;
@@ -209,14 +208,14 @@ export default function TenantBrowsePage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2">
               {filteredUnits.map((unit) => {
-                const firstPhoto = unit.photos?.[0];
+                const firstPhoto = unit.photos?.[0]?.url;
                 return (
                   <Card key={unit.id} className="group overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="relative h-44 md:h-52 overflow-hidden">
                       {firstPhoto ? (
                         <img 
                           src={firstPhoto} 
-                          alt={unit.unitIdentifier} 
+                          alt={unit.unitNumber || unit.title} 
                           loading="lazy" 
                           className="h-full w-full object-cover transition-transform group-hover:scale-105"
                         />
@@ -232,26 +231,26 @@ export default function TenantBrowsePage() {
                     <CardContent className="p-4 md:p-5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-foreground truncate">{unit.property?.title || "Premium Unit"}</h3>
+                          <h3 className="font-semibold text-foreground truncate">{unit.title || "Premium Unit"}</h3>
                           <p className="text-xs text-muted-foreground truncate">
-                            {unit.unitIdentifier} • {unit.property?.addressCity}
+                            {unit.unitNumber ? `Unit ${unit.unitNumber}` : unit.type} • {unit.city}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="text-lg md:text-xl font-bold text-secondary">${unit.rentAmount.toLocaleString()}</span>
+                          <span className="text-lg md:text-xl font-bold text-secondary">${(unit.monthlyRent || 0).toLocaleString()}</span>
                           <span className="text-xs text-muted-foreground">/mo</span>
                         </div>
                       </div>
                       <div className="mt-3 flex items-center gap-3 md:gap-4 text-xs md:text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Bed className="h-3.5 w-3.5" /> {unit.bedrooms}</span>
-                        <span className="flex items-center gap-1"><Bath className="h-3.5 w-3.5" /> {unit.bathrooms}</span>
-                        {unit.areaSqMeters && (
-                          <span className="flex items-center gap-1"><Maximize className="h-3.5 w-3.5" /> {unit.areaSqMeters} m²</span>
+                        {unit.bedrooms !== undefined && <span className="flex items-center gap-1"><Bed className="h-3.5 w-3.5" /> {unit.bedrooms}</span>}
+                        {unit.bathrooms !== undefined && <span className="flex items-center gap-1"><Bath className="h-3.5 w-3.5" /> {unit.bathrooms}</span>}
+                        {unit.squareFeet !== undefined && (
+                          <span className="flex items-center gap-1"><Maximize className="h-3.5 w-3.5" /> {unit.squareFeet} sqft</span>
                         )}
                       </div>
                       <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
                         <span className="text-xs text-muted-foreground">
-                          DEPOSIT: ${(unit.depositAmount || 0).toLocaleString()}
+                          MIN LEASE: {unit.minLeaseMonth || 1} mo
                         </span>
                         <Link to={`/browse/${unit.id}`}>
                           <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90 text-xs">

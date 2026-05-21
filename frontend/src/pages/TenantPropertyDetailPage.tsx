@@ -3,15 +3,15 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { propertyImages } from "@/data/mockData";
 import { MapPin, ArrowLeft, Bed, Bath, Maximize, Building2, CheckCircle, MessageSquare, CalendarCheck } from "lucide-react";
 import PhotoGalleryDialog from "@/components/PhotoGalleryDialog";
 import { useToast } from "@/hooks/use-toast";
 import { propertiesApi } from "@/lib/api/properties";
+import { unitsApi } from "@/lib/api/units";
 import type { Property } from "@/types/api";
 
 export default function TenantPropertyDetailPage() {
-  const { propertyId } = useParams();
+  const { listingId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -20,10 +20,18 @@ export default function TenantPropertyDetailPage() {
 
   useEffect(() => {
     async function loadProperty() {
-      if (!propertyId) return;
+      if (!listingId) return;
       try {
-        const response = await propertiesApi.getById(propertyId);
-        setProperty(response.data.property);
+        try {
+          const unitResponse = await unitsApi.getById(listingId);
+          console.log("Tenant listing (unit) response:", unitResponse);
+          setProperty(unitResponse.unit || null);
+          return;
+        } catch (unitErr) {
+          const response = await propertiesApi.getById(listingId);
+          console.log("Tenant listing (property) response:", response);
+          setProperty(response || null);
+        }
       } catch (err) {
         console.error("Failed to load property:", err);
       } finally {
@@ -31,13 +39,12 @@ export default function TenantPropertyDetailPage() {
       }
     }
     loadProperty();
-  }, [propertyId]);
+  }, [listingId]);
 
   const availableUnits = property?.units?.filter(u => u.status === "VACANT") || [];
-  const images = [
-    property?.media?.[0]?.filePath || propertyImages[0],
-    propertyImages[3], propertyImages[2], propertyImages[4], propertyImages[1], propertyImages[5],
-  ];
+  const rentAmount = property?.monthlyRent ? Number(property.monthlyRent) : 0;
+  const isWholeProperty = property?.hasUnits === false;
+  const images = property?.photos?.map((photo) => photo.url).filter(Boolean) || [];
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -76,25 +83,39 @@ export default function TenantPropertyDetailPage() {
       </Link>
 
       {/* Image Gallery */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-        <div className="col-span-2 md:col-span-2 row-span-2">
-          <img src={images[0]} alt={property.title} className="h-48 md:h-72 w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(0)} />
-        </div>
-        <div className="hidden md:block">
-          <img src={images[1]} alt="Gallery" className="h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(1)} />
-        </div>
-        <div className="col-span-1">
-          <img src={images[2]} alt="Gallery" className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(2)} />
-        </div>
-        <div className="col-span-1 relative">
-          <img src={images[3]} alt="Gallery" className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(3)} />
-          <button onClick={() => openGallery(0)} className="absolute inset-0 flex items-center justify-center rounded-lg bg-foreground/50 text-primary-foreground font-semibold hover:bg-foreground/60 transition-colors">
-            +{images.length} Photos
-          </button>
-        </div>
-      </div>
+      {images.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div className="col-span-2 md:col-span-2 row-span-2">
+              <img src={images[0]} alt={property.title} className="h-48 md:h-72 w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(0)} />
+            </div>
+            {images.slice(1, 4).map((img, index) => (
+              <div key={img} className={index === 0 ? "hidden md:block" : "col-span-1"}>
+                <img
+                  src={img}
+                  alt="Gallery"
+                  className={index === 0 ? "h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" : "h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"}
+                  onClick={() => openGallery(index + 1)}
+                />
+              </div>
+            ))}
+            {images.length > 4 && (
+              <div className="col-span-1 relative">
+                <img src={images[3]} alt="Gallery" className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(3)} />
+                <button onClick={() => openGallery(0)} className="absolute inset-0 flex items-center justify-center rounded-lg bg-foreground/50 text-primary-foreground font-semibold hover:bg-foreground/60 transition-colors">
+                  +{images.length} Photos
+                </button>
+              </div>
+            )}
+          </div>
 
-      <PhotoGalleryDialog images={images} initialIndex={galleryIndex} open={galleryOpen} onOpenChange={setGalleryOpen} />
+          <PhotoGalleryDialog images={images} initialIndex={galleryIndex} open={galleryOpen} onOpenChange={setGalleryOpen} />
+        </>
+      ) : (
+        <div className="h-48 md:h-72 w-full rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-sm text-muted-foreground">
+          No photos uploaded yet.
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
@@ -102,7 +123,7 @@ export default function TenantPropertyDetailPage() {
             <Badge className="bg-secondary text-secondary-foreground mb-2">{property.status}</Badge>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">{property.title}</h1>
             <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" /> {property.addressStreet}, {property.addressSubCity}, {property.addressCity}
+              <MapPin className="h-4 w-4" /> {property.address}, {property.city}
             </p>
           </div>
 
@@ -110,12 +131,11 @@ export default function TenantPropertyDetailPage() {
             <CardHeader><CardTitle>About this Property</CardTitle></CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground leading-relaxed">{property.description}</p>
-              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {[
-                  { label: "Year Built", value: property.buildingDetails?.yearBuilt },
-                  { label: "Total Floors", value: property.buildingDetails?.totalFloors },
-                  { label: "Total Units", value: property.buildingDetails?.totalUnits },
-                  { label: "Type", value: property.buildingDetails?.buildingType },
+                  { label: "Year Built", value: property.yearBuilt || "—" },
+                  { label: "Total Units", value: property.totalUnits || "—" },
+                  { label: "Type", value: property.type },
                 ].map((s, i) => (
                   <div key={i} className="text-center">
                     <p className="text-lg font-bold text-foreground">{s.value}</p>
@@ -127,14 +147,71 @@ export default function TenantPropertyDetailPage() {
           </Card>
 
           <Card>
+            <CardHeader><CardTitle>Pricing & Lease</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Rent</p>
+                <p className="text-xl font-semibold text-foreground">
+                  {rentAmount ? `$${rentAmount.toLocaleString()}` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Minimum Lease</p>
+                <p className="text-xl font-semibold text-foreground">
+                  {property.minLeaseMonth ? `${property.minLeaseMonth} months` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Late Fee</p>
+                <p className="text-xl font-semibold text-foreground">
+                  {property.latefee ? `$${property.latefee}` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Payment Frequency</p>
+                <p className="text-xl font-semibold text-foreground">
+                  {property.paidEvery ? `Every ${property.paidEvery} month(s)` : "—"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {isWholeProperty && (
+            <Card>
+              <CardHeader><CardTitle>Property Details</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Bedrooms</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {property.bedrooms ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Bathrooms</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {property.bathrooms ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Square Feet</p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {property.squareFeet ?? "—"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
             <CardHeader><CardTitle>Building Amenities</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {[
-                  ...(property.buildingDetails?.amenities || []),
-                  property.buildingDetails?.hasParking ? "Parking" : null,
-                  property.buildingDetails?.hasElevator ? "Elevator" : null,
-                  property.buildingDetails?.hasSecurity ? "24/7 Security" : null,
+                  property.hasParking ? "Parking" : null,
+                  property.hasElevator ? "Elevator" : null,
+                  property.hasSecurity ? "24/7 Security" : null,
+                  property.hasGym ? "Fitness Center" : null,
+                  property.hasPool ? "Swimming Pool" : null,
                 ].filter(Boolean).map((a, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <CheckCircle className="h-4 w-4 text-secondary" /> {a}
@@ -144,32 +221,32 @@ export default function TenantPropertyDetailPage() {
             </CardContent>
           </Card>
 
-          <div>
+          {property.hasUnits && (
+            <div>
             <h2 className="text-xl font-bold mb-4">Available Units ({availableUnits.length})</h2>
             <div className="space-y-4">
               {availableUnits.map((unit, i) => (
                 <Card key={unit.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="flex flex-col sm:flex-row gap-4 p-4">
-                    <img src={propertyImages[(i + 2) % propertyImages.length]} alt={unit.unitIdentifier} className="h-24 w-full sm:w-32 rounded-lg object-cover" />
+                    {unit.photos?.[0]?.url ? (
+                      <img src={unit.photos[0].url} alt={unit.unitNumber || unit.title} className="h-24 w-full sm:w-32 rounded-lg object-cover" />
+                    ) : (
+                      <div className="h-24 w-full sm:w-32 rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                        No photo
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground">{unit.unitIdentifier}</h3>
+                      <h3 className="font-semibold text-foreground">{unit.unitNumber ? `Unit ${unit.unitNumber}` : unit.title}</h3>
                       <div className="mt-1 flex items-center gap-3 md:gap-4 text-xs text-muted-foreground flex-wrap">
                         <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} Beds</span>
                         <span className="flex items-center gap-1"><Bath className="h-3 w-3" /> {unit.bathrooms} Baths</span>
-                        <span className="flex items-center gap-1"><Maximize className="h-3 w-3" /> {unit.areaSqMeters} m²</span>
-                        <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Floor {unit.floorNumber}</span>
+                        <span className="flex items-center gap-1"><Maximize className="h-3 w-3" /> {unit.squareFeet} sqft</span>
+                        {unit.floorNumber !== undefined && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Floor {unit.floorNumber}</span>}
                       </div>
-                      {unit.amenities && unit.amenities.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {unit.amenities.map((a, j) => (
-                            <Badge key={j} variant="outline" className="text-[10px]">{a}</Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                     <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2">
                       <div className="text-right">
-                        <span className="text-lg md:text-xl font-bold text-secondary">${unit.rentAmount.toLocaleString()}</span>
+                        <span className="text-lg md:text-xl font-bold text-secondary">${(unit.monthlyRent || 0).toLocaleString()}</span>
                         <span className="text-xs text-muted-foreground">/mo</span>
                       </div>
                       <Link to={`/browse/${unit.id}`}>
@@ -184,6 +261,7 @@ export default function TenantPropertyDetailPage() {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -192,10 +270,14 @@ export default function TenantPropertyDetailPage() {
             <CardContent className="p-6 space-y-4">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Starting From</p>
               <p className="text-3xl font-bold text-secondary">
-                ${availableUnits.length > 0 ? Math.min(...availableUnits.map(u => u.rentAmount)).toLocaleString() : "—"}
+                ${availableUnits.length > 0
+                  ? Math.min(...availableUnits.map(u => Number(u.monthlyRent || 0))).toLocaleString()
+                  : rentAmount.toLocaleString()}
                 <span className="text-sm font-normal text-muted-foreground">/month</span>
               </p>
-              <p className="text-xs text-muted-foreground">{availableUnits.length} unit(s) available</p>
+              <p className="text-xs text-muted-foreground">
+                {property.hasUnits ? `${availableUnits.length} unit(s) available` : "Whole property rental"}
+              </p>
               <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply}>
                 <MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW
               </Button>
@@ -212,7 +294,7 @@ export default function TenantPropertyDetailPage() {
                 <MapPin className="h-5 w-5 mr-2" /> Map View
               </div>
               <p className="mt-3 text-sm text-muted-foreground">
-                {property.addressStreet}, {property.addressSubCity}, {property.addressCity}
+                {property.address}, {property.city}
               </p>
             </CardContent>
           </Card>

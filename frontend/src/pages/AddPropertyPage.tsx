@@ -247,8 +247,8 @@ export default function AddPropertyPage() {
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           try {
-            await uploadPropertyImage(files[i], propertyId);
-            await propertiesApi.uploadPhoto(propertyId, files[i]);
+            const imageUrl = await uploadPropertyImage(files[i], propertyId);
+            await propertiesApi.uploadPhoto(propertyId, imageUrl);
           } catch (uploadErr) {
             console.error(`Failed to upload image ${i + 1}:`, uploadErr);
           }

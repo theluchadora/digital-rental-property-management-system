@@ -38,8 +38,7 @@ export const getPropertyById = async (id: string): Promise<SafeProperty | null> 
   const prop = await propertiesRepo.getPropertyById(id);
   const photos = await photosService.getPhotosByProperty(id);
   if (prop) {
-    const photoUrls = (photos || []).map((p) => p.url );
-    return { ...sanitize(prop), photos: photoUrls };
+    return { ...sanitize(prop), photos };
   }
   return prop ? sanitize(prop) : null;
 };
@@ -49,8 +48,7 @@ export const listProperties = async (): Promise<SafeProperty[]> => {
   const propsWithPhotos = await Promise.all(
     props.map(async (prop) => {
       const photos = await photosService.getPhotosByProperty(prop.id);
-      const photoUrls = (photos || []).map((p) => p.url );
-      return { ...sanitize(prop), photos: photoUrls };
+      return { ...sanitize(prop), photos };
     })
   );
   return propsWithPhotos;
@@ -70,8 +68,7 @@ export const getUnitsUnderProperty = async (propertyId: string): Promise<SafePro
   const unitsWithPhotos = await Promise.all(
     units.map(async (unit) => {
       const photos = await photosService.getPhotosByProperty(unit.id);
-      const photoUrls = (photos || []).map((p) => p.url );
-      return { ...sanitize(unit), photos: photoUrls };
+      return { ...sanitize(unit), photos };
     })
   );
   return unitsWithPhotos;
@@ -84,8 +81,7 @@ export const getVacantUnitsUnderProperty = async (propertyId: string): Promise<S
   const unitsWithPhotos = await Promise.all(
     units.filter((unit) => unit.status === "VACANT").map(async (unit) => {
       const photos = await photosService.getPhotosByProperty(unit.id);
-      const photoUrls = (photos || []).map((p) => p.url );
-      return { ...sanitize(unit), photos: photoUrls };
+      return { ...sanitize(unit), photos };
     })
   );
   return unitsWithPhotos;
@@ -98,8 +94,7 @@ export const getVacantProperties = async (): Promise<SafeProperty[]> => {
   const propsWithPhotos = await Promise.all(
     vacantProps.map(async (prop) => {
       const photos = await photosService.getPhotosByProperty(prop.id);
-      const photoUrls = (photos || []).map((p) => p.url );
-      return { ...sanitize(prop), photos: photoUrls };
+      return { ...sanitize(prop), photos };
     })
   );
   return propsWithPhotos;

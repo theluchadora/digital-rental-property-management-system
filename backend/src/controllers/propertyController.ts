@@ -20,7 +20,19 @@ export const createProperty = async (req: Request & { user?: { id: string , role
 export const getPropertyById = async (req: Request, res: Response) => {
   try {
     const property = await propertiesService.getPropertyById(req.params.id as string);
-    if (!property) return res.status(404).json({ error: "Property not found" });
+    if (!property) {
+      console.info("Property lookup", {
+        route: "GET /properties/:id",
+        id: req.params.id,
+        found: false,
+      });
+      return res.status(404).json({ error: "Property not found" });
+    }
+    console.info("Property lookup", {
+      route: "GET /properties/:id",
+      id: req.params.id,
+      found: true,
+    });
     res.json(property);
   } catch (err: any) {
     console.error("Error caught in propertyController.ts:", err);

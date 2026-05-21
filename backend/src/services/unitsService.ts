@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import * as propertiesRepo from "../repositories/propertiesRepository";
+import * as photosService from "./photosService";
 
 export const listUnits = async (
   where: Prisma.PropertyWhereInput,
@@ -12,8 +13,15 @@ export const listUnits = async (
     propertiesRepo.countProperties(where),
   ]);
 
+  const itemsWithPhotos = await Promise.all(
+    items.map(async (item) => {
+      const photos = await photosService.getPhotosByProperty(item.id);
+      return { ...item, photos };
+    })
+  );
+
   return {
-    data: items,
+    data: itemsWithPhotos,
     total,
     page,
     totalPages: Math.ceil(total / limit) || 1,

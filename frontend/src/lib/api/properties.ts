@@ -51,13 +51,9 @@ export const propertiesApi = {
     return response.data;
   },
 
-  // Upload photo
-  uploadPhoto: async (propertyId: string, file: File): Promise<ApiResponse<PropertyPhoto>> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await apiClient.post(`/properties/${propertyId}/photos`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+  // Upload photo (expects a URL already stored in Cloudinary or similar)
+  uploadPhoto: async (propertyId: string, url: string): Promise<ApiResponse<PropertyPhoto>> => {
+    const response = await apiClient.post("/photos", { propertyId, url });
     return response.data;
   },
 

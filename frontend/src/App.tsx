@@ -59,8 +59,8 @@ function AppRoutes() {
         <Route path="/properties/:propertyId/edit" element={<ProtectedRoute allowedRoles={["OWNER"]}><EditPropertyPage /></ProtectedRoute>} />
         <Route path="/properties/:propertyId/add-units" element={<ProtectedRoute allowedRoles={["OWNER"]}><AddUnitsPage /></ProtectedRoute>}  />
         <Route path="/browse" element={<ProtectedRoute allowedRoles={["TENANT"]}><TenantBrowsePage /></ProtectedRoute>} />
-        <Route path="/browse/property/:propertyId" element={<ProtectedRoute allowedRoles={["TENANT"]}><TenantPropertyDetailPage /></ProtectedRoute>} />
-        <Route path="/browse/:unitId" element={<ProtectedRoute allowedRoles={["TENANT"]}><UnitDetailPage /></ProtectedRoute>} />
+        <Route path="/browse/:listingId" element={<ProtectedRoute allowedRoles={["TENANT"]}><TenantPropertyDetailPage /></ProtectedRoute>} />
+        <Route path="/browse/unit/:unitId" element={<ProtectedRoute allowedRoles={["TENANT"]}><UnitDetailPage /></ProtectedRoute>} />
         <Route path="/leases" element={<LeasesPage />} />
         <Route path="/leases/new" element={<ProtectedRoute allowedRoles={["OWNER"]}><CreateLeasePage /></ProtectedRoute>} />
         <Route path="/leases/:leaseId" element={<LeaseDetailPage />} />

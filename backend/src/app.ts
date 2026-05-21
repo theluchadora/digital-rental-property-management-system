@@ -6,6 +6,7 @@ import { authenticateToken } from "./auth/authMiddleware";
 import { initializePayment, paymentWebhook, checkPaymentStatus } from './controllers/paymentController';
 import swaggerUi from "swagger-ui-express";
 import swaggerDocument from "./swagger";
+import { httpLogger } from "./utils/logger";
 
 
 
@@ -23,6 +24,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import messagesRoutes from "./routes/messagesRoutes";
 
 const app = express();
+app.disable("etag");
 // Allow credentials (cookies) to be sent from the browser
 app.use(
   cors({
@@ -30,6 +32,16 @@ app.use(
     credentials: true,
   })
 );
+app.use(httpLogger);
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+  }
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
