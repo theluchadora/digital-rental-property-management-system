@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from "express";
 import pino from "pino";
 import pinoHttp from "pino-http";
 
@@ -12,27 +13,39 @@ const logger = pino({
         options: {
           colorize: true,
           translateTime: "SYS:standard",
-          ignore: "pid,hostname,req,res,responseTime",
+          ignore: "pid,hostname",
         },
       },
 });
 
+/** Logs the moment a request hits the server (before body parsing / handlers). */
+export const incomingRequestLogger = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const path = req.originalUrl || req.url;
+  const start = Date.now();
+
+  logger.info(
+    { method: req.method, path, ip: req.ip },
+    `→ ${req.method} ${path}`
+  );
+
+  res.on("finish", () => {
+    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    logger[level](
+      { method: req.method, path, status: res.statusCode, ms: Date.now() - start },
+      `← ${req.method} ${path} ${res.statusCode} (${Date.now() - start}ms)`
+    );
+  });
+
+  next();
+};
+
 export const httpLogger = pinoHttp({
   logger,
-  customLogLevel: (_req, res, err) => {
-    if (err || res.statusCode >= 500) return "error";
-    if (res.statusCode >= 400) return "warn";
-    return "info";
-  },
-  customSuccessMessage: (req, res) =>
-    `${req.method} ${req.url} ${res.statusCode}`,
-  customErrorMessage: (req, res, err) =>
-    `${req.method} ${req.url} ${res.statusCode} - ${err.message}`,
-  serializers: {
-    req: (req) => ({ method: req.method, url: req.url }),
-    res: (res) => ({ statusCode: res.statusCode }),
-    err: pino.stdSerializers.err,
-  },
+  autoLogging: false,
 });
 
 export default logger;

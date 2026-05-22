@@ -1,12 +1,15 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Megaphone, Plus, Building2, Bell } from "lucide-react";
+import { Megaphone, Plus, Building2, Bell, ExternalLink } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { announcementsApi } from "@/lib/api/announcements";
 import { propertiesApi } from "@/lib/api/properties";
 import { useToast } from "@/hooks/use-toast";
+import { LeaseActionButtons } from "@/components/LeaseActionButtons";
+import { leasesApi } from "@/lib/api/leases";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +32,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import type { Announcement } from "@/types/api";
+
+function AnnouncementLeaseActions({ leaseId }: { leaseId: string }) {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["lease", leaseId],
+    queryFn: () => leasesApi.getById(leaseId).then((r) => r.data.lease),
+  });
+
+  if (!data) return null;
+  return (
+    <LeaseActionButtons
+      lease={data}
+      compact
+      onLeaseUpdated={(updated) => {
+        queryClient.setQueryData(["lease", leaseId], updated);
+        queryClient.invalidateQueries({ queryKey: ["announcements"] });
+        queryClient.invalidateQueries({ queryKey: ["leases"] });
+      }}
+    />
+  );
+}
 
 export default function AnnouncementsPage() {
   const { user } = useAuth();
@@ -83,13 +108,42 @@ export default function AnnouncementsPage() {
   const announcements = announcementsData?.data || [];
   const properties = propertiesData?.data || [];
 
+  const renderAnnouncementActions = (announcement: Announcement) => {
+    if (announcement.leaseId) {
+      return (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
+          <Link to={`/leases/${announcement.leaseId}`}>
+            <Button variant="outline" size="sm">
+              <ExternalLink className="mr-1 h-3 w-3" /> View application
+            </Button>
+          </Link>
+          <AnnouncementLeaseActions leaseId={announcement.leaseId} />
+        </div>
+      );
+    }
+    if (announcement.invoiceId && !isOwner) {
+      return (
+        <div className="mt-4 border-t pt-4">
+          <Link to="/payments">
+            <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">
+              Pay invoice
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold uppercase text-foreground">Announcements</h1>
           <p className="text-sm text-muted-foreground">
-            {isOwner ? "Broadcast important notices to your tenants." : "Stay updated with notices from your landlord."}
+            {isOwner
+              ? "Applications, notices, and messages for your portfolio."
+              : "Stay updated with notices from your landlord."}
           </p>
         </div>
         {isOwner && (
@@ -140,8 +194,8 @@ export default function AnnouncementsPage() {
               </div>
               <DialogFooter className="mt-4">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button 
-                  onClick={handleCreate} 
+                <Button
+                  onClick={handleCreate}
                   disabled={createMutation.isPending}
                   className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
                 >
@@ -177,7 +231,7 @@ export default function AnnouncementsPage() {
                       {announcement.title}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Posted by {announcement.author?.firstName} {announcement.author?.lastName} •{" "}
+                      Posted by {announcement.owner?.firstName} {announcement.owner?.lastName} •{" "}
                       {format(new Date(announcement.createdAt), "PPP p")}
                     </CardDescription>
                   </div>
@@ -196,6 +250,7 @@ export default function AnnouncementsPage() {
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
                   {announcement.content}
                 </p>
+                {renderAnnouncementActions(announcement)}
               </CardContent>
             </Card>
           ))

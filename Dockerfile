@@ -38,7 +38,7 @@ FROM node:20-alpine
 RUN apk add --no-cache nginx gettext
 
 ENV NODE_ENV=production
-ENV BACKEND_PORT=8000
+ENV BACKEND_PORT=5000
 ENV PORT=10000
 
 WORKDIR /app/backend

@@ -288,6 +288,7 @@ model Lease {
   // Invoices
   invoices    Invoice[]
   documents   LeaseDocument[]
+  announcements Announcement[]
   
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -358,6 +359,7 @@ model Invoice {
   
   // Relations
   receipts     PaymentReceipt[]
+  announcements Announcement[]
   
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -515,6 +517,10 @@ model Announcement {
   owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   propertyId  String?  @db.Uuid
   property    Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  leaseId     String?  @db.Uuid
+  lease       Lease?   @relation(fields: [leaseId], references: [id], onDelete: SetNull)
+  invoiceId   String?  @db.Uuid
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   title       String
   content     String
@@ -524,6 +530,7 @@ model Announcement {
 
   @@index([ownerId])
   @@index([propertyId])
+  @@index([leaseId])
   @@map("announcements")
 }
 

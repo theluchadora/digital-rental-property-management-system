@@ -2,6 +2,7 @@ import * as leasesRepo from "../repositories/leasesRepository";
 import * as notificationsService from "./notificationsService";
 import * as invoicesService from "./invoicesService";
 import * as propertiesService from "./propertiesService";
+import * as announcementsService from "./announcementsService";
 import { NotificationType } from "@prisma/client";
 import * as leaseDocumentsService from "./leaseDocumentsService";
 
@@ -195,18 +196,27 @@ export const approveLease = async (leaseId: string , verdict: boolean) => {
         });
 
 
-        // Create initial invoice for the lease
-        await invoicesService.createInvoice({
+        const invoice = await invoicesService.createInvoice({
             leaseId: lease.id,
             billingMonth: new Date(),
             amountDue: monthlyRent * lease.paidEvery,
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), // Due in 7 days
+            dueDate: new Date(new Date().setDate(new Date().getDate() + 7)),
             lineItems: [
             {
                 description: "Monthly Rent",
                 amount: monthlyRent,
             },
             ],
+        });
+
+        await announcementsService.createSystemAnnouncement({
+          ownerId: lease.ownerId,
+          propertyId: lease.propertyId,
+          leaseId: lease.id,
+          invoiceId: invoice.id,
+          title: "Lease approved — payment required",
+          content: `Your application for ${property.title} was approved. Pay ${monthlyRent * lease.paidEvery} ETB to confirm your lease.`,
+          notifyUserId: lease.tenantId,
         });
 
         return updated;
@@ -253,12 +263,21 @@ export const initiateLease = async (propertyId: string , tenantId: string) => {
   await notificationsService.createNotification({
     userId: property.ownerId,
     type: NotificationType.LEASE,
-    title: "New Lease Created",
-    content: `Waiting for approval: A new lease has been created for property ${property.title}.`,
+    title: "New rental application",
+    content: `A tenant applied for ${property.title}. Review and accept or decline the application.`,
     leaseId: lease.id,
-
   });
 
+  const estimatedDue = monthlyRent * (property.paidEvery ?? lease.paidEvery ?? 1);
+  await announcementsService.createSystemAnnouncement({
+    ownerId: property.ownerId,
+    propertyId: propertyId,
+    leaseId: lease.id,
+    title: "Pending application — review required",
+    content: `New application for ${property.title}. Estimated first payment: ${estimatedDue} ETB. Open the lease to accept or decline.`,
+    notifyUserId: property.ownerId,
+    notificationType: NotificationType.LEASE,
+  });
 }
 
 

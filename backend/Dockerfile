@@ -12,6 +12,6 @@ COPY . .
 
 RUN npx tsc
 
-EXPOSE 8000
+EXPOSE 5000
 
 CMD ["node", "dist/server.js"]

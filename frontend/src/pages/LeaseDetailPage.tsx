@@ -8,9 +8,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency, formatUserName } from "@/lib/utils";
 import { leasesApi } from "@/lib/api/leases";
-import type { Lease, Invoice } from "@/types/api";
+import { LeaseActionButtons } from "@/components/LeaseActionButtons";
+import type { Lease } from "@/types/api";
 
 const statusColors: Record<string, string> = {
+  INITIATED: "bg-warning/10 text-warning border-warning/30",
+  AWAITINGPAYMENT: "bg-warning/10 text-warning border-warning/30",
   ACTIVE: "bg-secondary/10 text-secondary border-secondary/30",
   DRAFT: "bg-muted text-muted-foreground border-border",
   EXPIRED: "bg-destructive/10 text-destructive border-destructive/30",
@@ -100,7 +103,8 @@ export default function LeaseDetailPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-1">{monthsDiff} month lease • Created {formatDate(lease.createdAt)}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col items-end gap-2">
+          <LeaseActionButtons lease={lease} onLeaseUpdated={setLease} />
           {lease.documents && lease.documents.length > 0 && (
             <Button
               variant="outline"

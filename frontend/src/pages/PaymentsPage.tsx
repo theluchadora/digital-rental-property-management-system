@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { chapaApi } from "@/lib/api/chapa";
 import { invoicesApi } from "@/lib/api/invoices";
+import { openChapaCheckout, pollChapaPayment, startChapaPayment } from "@/lib/chapa-payment";
 import type { Invoice } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -17,18 +18,18 @@ const statusColors: Record<string, string> = {
   UNPAID: "bg-muted text-muted-foreground",
 };
 
-
 const ITEMS_PER_PAGE = 5;
 
 export default function PaymentsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isOwner = user?.role === "OWNER";
-  
+  const stopPollRef = useRef<(() => void) | null>(null);
+
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,96 +46,112 @@ export default function PaymentsPage() {
     loadInvoices();
   }, [statusFilter]);
 
-  
+  const handlePaymentSuccess = (invoiceId: string) => {
+    setInvoices((prev) =>
+      prev.map((inv) => (inv.id === invoiceId ? { ...inv, status: "PAID" as const } : inv))
+    );
+    setPayingInvoiceId(null);
+    toast({ title: "Payment successful" });
+  };
+
+  const startPaymentPolling = (invoiceId: string, txRef: string) => {
+    stopPollRef.current?.();
+    stopPollRef.current = pollChapaPayment(
+      invoiceId,
+      txRef,
+      () => handlePaymentSuccess(invoiceId),
+      () => {
+        setPayingInvoiceId(null);
+        toast({
+          title: "Payment not confirmed yet",
+          description: "Complete payment in Chapa or try again later.",
+          variant: "destructive",
+        });
+      }
+    );
+  };
+
   const handlePayWithChapa = async (invoice: Invoice) => {
     setPayingInvoiceId(invoice.id);
     try {
-      const response = await chapaApi.initializePayment({
-        amount: invoice.amountDue.toFixed(2),
-        email: user?.email || 'tenant@example.com',
-        first_name: user?.firstName || 'Tenant',
-        last_name: user?.lastName || 'User',
+      const { checkoutUrl, txRef, testMode, testPhones } = await startChapaPayment({
+        amountDue: invoice.amountDue,
+        email: user?.email || "tenant@gmail.com",
+        firstName: user?.firstName || "Tenant",
+        lastName: user?.lastName || "User",
+        phoneNumber: user?.phoneNumber,
+        invoiceId: invoice.id,
       });
 
-      if (response.checkout_url) {
-        // Save tx_ref
-        localStorage.setItem(`paying_invoice_${invoice.id}`, response.tx_ref);
-        
-        // Open Chapa in NEW TAB
-        window.open(response.checkout_url, '_blank');
-        
-        toast({
-          title: "Chapa opened in new tab",
-          description: "Complete payment, then come back here.",
-        });
-        
-        // Start checking payment status
-        checkPaymentLoop(invoice.id, response.tx_ref);
-      } else {
-        setPayingInvoiceId(null);
-      }
-    } catch (error) {
-      toast({ title: "Error", description: "Payment failed", variant: "destructive" });
+      openChapaCheckout(checkoutUrl, txRef, invoice.id);
+      toast({
+        title: "Chapa opened",
+        description: testMode
+          ? `Test mode: use phone ${testPhones?.[0] ?? "0900123456"} and OTP 12345 if asked. Other numbers will fail.`
+          : "Complete payment in the new tab. This page will update when paid.",
+        duration: testMode ? 12000 : 5000,
+      });
+      startPaymentPolling(invoice.id, txRef);
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (error as Error)?.message ||
+        "Payment failed";
+      toast({ title: "Payment failed", description: message, variant: "destructive" });
       setPayingInvoiceId(null);
     }
   };
 
-// Keep checking until paid
-const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
-  const check = async () => {
-    try {
-      const result = await chapaApi.verifyTransaction(txRef, invoiceId);
-      
-      if (result.status === 'success') {
-        // Update invoice
-        setInvoices(prev => prev.map(inv => 
-          inv.id === invoiceId ? { ...inv, status: "PAID" as const } : inv
-        ));
-        localStorage.removeItem(`paying_invoice_${invoiceId}`);
-        toast({ title: "Payment Successful! ✅" });
-        return; // Stop checking
+  useEffect(() => {
+    const txRef = searchParams.get("tx_ref") || searchParams.get("trx_ref");
+    const invoiceId = searchParams.get("invoice_id");
+    const returnStatus = searchParams.get("status");
+    if (searchParams.get("chapa_return") && txRef && invoiceId) {
+      if (returnStatus === "failed" || returnStatus === "cancelled") {
+        toast({
+          title: "Payment not completed",
+          description:
+            "In Chapa test mode use phone 0900123456 (OTP 12345). Any other number fails.",
+          variant: "destructive",
+        });
+      } else {
+        startPaymentPolling(invoiceId, txRef);
       }
-      
-      // Check again in 5 seconds
-      setTimeout(check, 5000);
-    } catch (error) {
-      setTimeout(check, 5000);
+      setSearchParams({}, { replace: true });
     }
-  };
-  
-  check();
-};
+  }, [searchParams, setSearchParams]);
 
-  // ✅ CHECK PAYMENT STATUS ON RETURN
   useEffect(() => {
     const checkReturningPayments = async () => {
       for (const inv of invoices) {
         const txRef = localStorage.getItem(`paying_invoice_${inv.id}`);
-        if (txRef && inv.status !== 'PAID') {
+        if (txRef && inv.status !== "PAID") {
           try {
             const result = await chapaApi.verifyTransaction(txRef, inv.id);
-            if (result.status === 'success') {
-              setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, status: "PAID" as const } : i));
-              localStorage.removeItem(`paying_invoice_${inv.id}`);
-              toast({ title: "Payment Successful! ✅", description: `${inv.id} is now PAID.` });
+            if (result.status === "success") {
+              handlePaymentSuccess(inv.id);
             }
-          } catch (e) {
-            // Keep waiting
+          } catch {
+            // still pending
           }
         }
       }
     };
-    
     checkReturningPayments();
   }, [invoices]);
 
+  useEffect(() => () => stopPollRef.current?.(), []);
+
   const filteredInvoices = invoices;
   const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE));
-  const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const paginatedInvoices = filteredInvoices.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
-  const unpaidCount = invoices.filter(i => i.status === "UNPAID").length;
-  const overdueCount = invoices.filter(i => i.status === "OVERDUE").length;
-  const paidCount = invoices.filter(i => i.status === "PAID").length;
+  const unpaidCount = invoices.filter((i) => i.status === "UNPAID").length;
+  const overdueCount = invoices.filter((i) => i.status === "OVERDUE").length;
+  const paidCount = invoices.filter((i) => i.status === "PAID").length;
   const totalCount = invoices.length;
   const collectionRate = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0;
 
@@ -155,6 +172,17 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
           </Button>
         )}
       </div>
+
+      {!isOwner && (
+        <Card className="border-secondary/30 bg-secondary/5">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            <strong className="text-foreground">Chapa test mode:</strong> On the checkout page use phone{" "}
+            <code className="text-secondary">0900123456</code>, <code className="text-secondary">0900112233</code>, or{" "}
+            <code className="text-secondary">0900881111</code>. If prompted for OTP, enter <code className="text-secondary">12345</code>.
+            Other phone numbers will show &quot;payment failed&quot;.
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">UNPAID</p><p className="text-2xl font-bold">{unpaidCount}</p></CardContent></Card>
@@ -189,7 +217,7 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
                   <tr key={inv.id} className="hover:bg-muted/50">
                     <td className="p-4 font-medium">{inv.id.replace("inv-", "INV-").toUpperCase()}</td>
                     <td className="p-4">{new Date(inv.billingMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</td>
-                    <td className="p-4 font-medium">{inv.amountDue.toLocaleString()} ETB</td>
+                    <td className="p-4 font-medium">{Number(inv.amountDue).toLocaleString()} ETB</td>
                     <td className="p-4">{new Date(inv.dueDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })}</td>
                     <td className="p-4"><Badge className={statusColors[inv.status]}>{inv.status}</Badge></td>
                     <td className="p-4">
@@ -212,11 +240,11 @@ const checkPaymentLoop = async (invoiceId: string, txRef: string) => {
       <div className="flex items-center justify-between">
         <p className="text-xs">Showing {Math.min(currentPage * ITEMS_PER_PAGE, filteredInvoices.length)} of {filteredInvoices.length}</p>
         <div className="flex gap-1">
-          <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button key={page} size="icon" className={`h-8 w-8 ${page === currentPage ? "bg-secondary text-secondary-foreground" : ""}`} variant={page === currentPage ? "default" : "outline"} onClick={() => setCurrentPage(page)}>{page}</Button>
           ))}
-          <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </div>
     </div>

@@ -23,8 +23,9 @@ export const list = async (req: Request & { user?: { id: string; role: string } 
     if (req.user?.role === "TENANT" && req.user?.id) {
       const leases = await leasesRepo.getLeasesByTenantId(req.user.id);
       const propertyIds = leases.map((l) => l.propertyId);
+      const ownerIds = Array.from(new Set(leases.map((l) => l.ownerId)));
       where.OR = [
-        { propertyId: null },
+        { propertyId: null, ownerId: { in: ownerIds } },
         { propertyId: { in: propertyIds } },
       ];
     }

@@ -3,10 +3,15 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { Router } from "express";
 import { authenticateToken } from "./auth/authMiddleware";
-import { initializePayment, paymentWebhook, checkPaymentStatus } from './controllers/paymentController';
+import {
+  initializePayment,
+  paymentWebhook,
+  paymentCallback,
+  checkPaymentStatus,
+} from "./controllers/paymentController";
 import swaggerUi from "swagger-ui-express";
 import swaggerDocument from "./swagger";
-import { httpLogger } from "./utils/logger";
+import logger, { incomingRequestLogger } from "./utils/logger";
 
 
 
@@ -25,14 +30,17 @@ import messagesRoutes from "./routes/messagesRoutes";
 
 const app = express();
 app.disable("etag");
-// Allow credentials (cookies) to be sent from the browser
+
 app.use(
   cors({
     origin: true,
     credentials: true,
   })
 );
-app.use(httpLogger);
+
+// Log route immediately when request arrives
+app.use(incomingRequestLogger);
+
 app.use((req, res, next) => {
   if (req.path.startsWith("/api")) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -62,6 +70,10 @@ app.use(
 
 const router = Router();
 
+router.get("/health", (_req, res) => {
+  res.json({ ok: true, timestamp: new Date().toISOString() });
+});
+
 // Mount user routes under /api/users
 router.use("/users", userRoutes);
 
@@ -85,12 +97,31 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/messages", messagesRoutes);
 
 // payment routes
-router.post('/payments/initialize', initializePayment);
-router.post('/payments/webhook', paymentWebhook);  
-router.get('/payments/verify/:tx_ref', checkPaymentStatus);  
+router.post("/payments/initialize", initializePayment);
+router.get("/payments/callback", paymentCallback);
+router.post("/payments/webhook", paymentWebhook);
+router.get("/payments/webhook", paymentWebhook);
+router.get("/payments/verify/:tx_ref", checkPaymentStatus);  
 
 app.use("/api", router);
 app.use("/api/v1", router);
 app.use("/api/v1/api", router);
+
+app.use((req, res) => {
+  logger.warn({ method: req.method, path: req.originalUrl }, "Route not found");
+  res.status(404).json({ error: "Not found" });
+});
+
+app.use(
+  (err: Error & { status?: number }, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    logger.error(
+      { err, method: req.method, path: req.originalUrl, stack: err.stack },
+      `Unhandled error on ${req.method} ${req.originalUrl}`
+    );
+    res.status(err.status && err.status >= 400 && err.status < 600 ? err.status : 500).json({
+      error: err.message || "Internal server error",
+    });
+  }
+);
 
 export default app;

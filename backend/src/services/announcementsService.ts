@@ -16,7 +16,6 @@ export const createAnnouncement = async (input: {
     content: input.content,
   } as Prisma.AnnouncementCreateInput);
 
-  // Notify tenants under the owner's leases
   try {
     const leases = await leasesRepo.getLeasesByOwnerId(input.ownerId);
     const tenantIds = Array.from(new Set(leases.map((l) => l.tenantId)));
@@ -31,8 +30,43 @@ export const createAnnouncement = async (input: {
       )
     );
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("Failed to notify tenants for announcement", err);
+  }
+
+  return announcement;
+};
+
+/** System-generated announcement for lease/application workflow (single recipient). */
+export const createSystemAnnouncement = async (input: {
+  ownerId: string;
+  propertyId?: string;
+  leaseId?: string;
+  invoiceId?: string;
+  title: string;
+  content: string;
+  notifyUserId: string;
+  notificationType?: NotificationType;
+}) => {
+  const announcement = await announcementsRepo.createAnnouncement({
+    owner: { connect: { id: input.ownerId } },
+    property: input.propertyId ? { connect: { id: input.propertyId } } : undefined,
+    lease: input.leaseId ? { connect: { id: input.leaseId } } : undefined,
+    invoice: input.invoiceId ? { connect: { id: input.invoiceId } } : undefined,
+    title: input.title,
+    content: input.content,
+  } as Prisma.AnnouncementCreateInput);
+
+  try {
+    await notificationsService.createNotification({
+      userId: input.notifyUserId,
+      type: input.notificationType ?? NotificationType.ANNOUNCEMENT,
+      title: input.title,
+      content: input.content,
+      leaseId: input.leaseId,
+      invoiceId: input.invoiceId,
+    });
+  } catch (err) {
+    console.error("Failed to send system announcement notification", err);
   }
 
   return announcement;

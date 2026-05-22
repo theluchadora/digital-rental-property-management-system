@@ -267,6 +267,8 @@ export interface Announcement {
   id: string;
   ownerId: string;
   propertyId?: string | null;
+  leaseId?: string | null;
+  invoiceId?: string | null;
   title: string;
   content: string;
   createdAt: string;
