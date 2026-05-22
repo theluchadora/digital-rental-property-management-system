@@ -12,6 +12,8 @@ import { messagesApi } from "@/lib/api/messages";
 import { notificationsApi } from "@/lib/api/notifications";
 import { subscribeToEvent } from "@/lib/websocket";
 import apiClient from "@/lib/api-client";
+import { PageLoader } from "@/components/ui/loading-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Conversation, Message, User } from "@/types/api";
 
 
@@ -36,7 +38,7 @@ export default function MessagesPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Queries
-  const { data: conversationsResponse } = useQuery({
+  const { data: conversationsResponse, isLoading: conversationsLoading } = useQuery({
     queryKey: ["conversations"],
     queryFn: messagesApi.getConversations,
     refetchInterval: false,
@@ -50,7 +52,7 @@ export default function MessagesPage() {
     ? (activeConv.participantAId === user?.id ? activeConv.participantBId : activeConv.participantAId)
     : (urlUserId || undefined);
 
-  const { data: messagesResponse } = useQuery({
+  const { data: messagesResponse, isLoading: messagesLoading } = useQuery({
     queryKey: ["messages", otherUserId],
     queryFn: () => messagesApi.list({ otherUserId, limit: 100 }),
     enabled: !!otherUserId,
@@ -230,7 +232,19 @@ export default function MessagesPage() {
           </button>
         </div>
         <div className="divide-y divide-border overflow-y-auto">
-          {conversations.map(conv => {
+          {conversationsLoading ? (
+            <div className="space-y-2 p-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : conversations.map(conv => {
             const otherUser = getOtherUser(conv);
             const unread = conv.lastMessage?.receiverId === user?.id && !conv.lastMessage?.readAt;
             return (
@@ -255,7 +269,7 @@ export default function MessagesPage() {
               </button>
             )
           })}
-          {conversations.length === 0 && (
+          {!conversationsLoading && conversations.length === 0 && (
              <div className="p-4 text-center text-sm text-muted-foreground">No conversations</div>
           )}
         </div>
@@ -292,6 +306,9 @@ export default function MessagesPage() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
+              {messagesLoading && messages.length === 0 ? (
+                <PageLoader label="Loading messages..." />
+              ) : null}
               {messages.map((msg) => {
                 const isSent = msg.senderId === user?.id;
                 return (

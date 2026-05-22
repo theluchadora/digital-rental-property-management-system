@@ -198,6 +198,20 @@ export const removeTenant = async (req: Request, res: Response) => {
 	}
 };
 
+export const cancel = async (req: Request & { user?: { id: string; role: string } }, res: Response) => {
+	try {
+		if (!req.user?.id) return res.status(401).json({ error: "Unauthorized" });
+		if (req.user.role !== "TENANT") {
+			return res.status(403).json({ error: "Only tenants can cancel applications" });
+		}
+		const lease = await leasesService.cancelApplication(req.params.id as string, req.user.id);
+		res.json({ lease, message: "Application cancelled" });
+	} catch (err: any) {
+		console.error("Error caught in leaseController.ts:", err);
+		res.status(400).json({ error: err.message || "Failed to cancel application" });
+	}
+};
+
 export const decide = async (req: Request & { user?: { id: string; role: string } }, res: Response) => {
 	try {
 		const body = decisionSchema.parse(req.body);

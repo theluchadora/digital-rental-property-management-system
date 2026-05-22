@@ -10,6 +10,7 @@ import { MapPin, Plus, Download, Loader2, Building2, Car, Home, Eye, User } from
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { propertiesApi } from "@/lib/api/properties";
+import { CardGridSkeleton } from "@/components/ui/loading-state";
 import type { Property } from "@/types/api";
 
 export default function OwnerPropertiesPage() {
@@ -175,11 +176,7 @@ export default function OwnerPropertiesPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-      </div>
-    );
+    return <CardGridSkeleton count={6} />;
   }
 
   return (

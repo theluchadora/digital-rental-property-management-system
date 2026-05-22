@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { propertiesApi } from "@/lib/api/properties";
 import { unitsApi } from "@/lib/api/units";
 import { leasesApi } from "@/lib/api/leases";
+import { PageLoader } from "@/components/ui/loading-state";
 import type { Property } from "@/types/api";
 
 export default function TenantPropertyDetailPage() {
@@ -77,7 +78,7 @@ export default function TenantPropertyDetailPage() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading property details...</div>;
+    return <PageLoader label="Loading property details..." />;
   }
 
   if (!property) {

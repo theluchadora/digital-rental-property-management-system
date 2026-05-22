@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { PageLoader } from "@/components/ui/loading-state";
 import type { Announcement } from "@/types/api";
 
 function AnnouncementLeaseActions({ leaseId }: { leaseId: string }) {
@@ -209,9 +210,7 @@ export default function AnnouncementsPage() {
 
       <div className="grid gap-6">
         {isLoading ? (
-          <div className="flex justify-center p-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-secondary border-t-transparent" />
-          </div>
+          <PageLoader label="Loading announcements..." />
         ) : announcements.length === 0 ? (
           <Card className="border-dashed border-2">
             <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">

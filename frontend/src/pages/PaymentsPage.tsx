@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { chapaApi } from "@/lib/api/chapa";
 import { invoicesApi } from "@/lib/api/invoices";
 import { openChapaCheckout, pollChapaPayment, startChapaPayment } from "@/lib/chapa-payment";
+import { StatsGridSkeleton, TableSkeleton } from "@/components/ui/loading-state";
 import type { Invoice } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -31,9 +32,11 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadInvoices = async () => {
+      setIsLoading(true);
       try {
         const response = await invoicesApi.list({
           status: statusFilter === "all" ? undefined : statusFilter.toUpperCase(),
@@ -41,10 +44,13 @@ export default function PaymentsPage() {
         setInvoices(response.data.data || []);
       } catch (err) {
         console.error("Failed to load invoices:", err);
+        toast({ title: "Failed to load invoices", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
       }
     };
     loadInvoices();
-  }, [statusFilter]);
+  }, [statusFilter, toast]);
 
   const handlePaymentSuccess = (invoiceId: string) => {
     setInvoices((prev) =>
@@ -184,12 +190,16 @@ export default function PaymentsPage() {
         </Card>
       )}
 
+      {isLoading ? (
+        <StatsGridSkeleton count={4} />
+      ) : (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">UNPAID</p><p className="text-2xl font-bold">{unpaidCount}</p></CardContent></Card>
         <Card className="bg-destructive/5 border-destructive/20"><CardContent className="p-4"><p className="text-xs uppercase text-destructive">OVERDUE</p><p className="text-2xl font-bold text-destructive">{overdueCount}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">PAID</p><p className="text-2xl font-bold text-success">{paidCount}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">COLLECTION RATE</p><p className="text-2xl font-bold text-secondary">{collectionRate}%</p></CardContent></Card>
       </div>
+      )}
 
       <Card>
         <CardHeader className="flex-row items-center justify-between pb-4">
@@ -205,6 +215,9 @@ export default function PaymentsPage() {
           </Select>
         </CardHeader>
         <CardContent className="p-0">
+          {isLoading ? (
+            <TableSkeleton rows={5} cols={6} />
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[700px]">
               <thead>
@@ -234,6 +247,7 @@ export default function PaymentsPage() {
               </tbody>
             </table>
           </div>
+          )}
         </CardContent>
       </Card>
 

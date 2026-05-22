@@ -11,6 +11,7 @@ import { announcementsApi } from "@/lib/api/announcements";
 import { dashboardApi } from "@/lib/api/dashboard";
 
 import { Announcement } from "@/types/api";
+import { StatsGridSkeleton, CardGridSkeleton } from "@/components/ui/loading-state";
 
 export default function TenantDashboard() {
   const { user } = useAuth();
@@ -63,7 +64,9 @@ export default function TenantDashboard() {
         <p className="text-sm text-muted-foreground">Here's what's happening with your tenancy.</p>
       </div>
 
-      {/* Quick Stats */}
+      {isStatsLoading ? (
+        <StatsGridSkeleton count={4} />
+      ) : (
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <Card>
           <CardContent className="flex items-center gap-3 md:gap-4 p-3 md:p-4">
@@ -122,6 +125,7 @@ export default function TenantDashboard() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Lease Summary + Announcements */}
       <div className="mt-6 md:mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -170,7 +174,11 @@ export default function TenantDashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">Loading announcements...</p>
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
+                ))}
+              </div>
             ) : announcements.length === 0 ? (
               <p className="text-sm text-muted-foreground">No recent announcements.</p>
             ) : (

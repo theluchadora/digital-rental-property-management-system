@@ -42,6 +42,10 @@ export const leasesApi = {
   decide: (leaseId: string, accept: boolean) =>
     apiClient.post<{ lease: Lease }>(`/leases/${leaseId}/decision`, { accept }),
 
+  /** Tenant cancels pending application (INITIATED or AWAITINGPAYMENT) */
+  cancel: (leaseId: string) =>
+    apiClient.post<{ lease: Lease; message: string }>(`/leases/${leaseId}/cancel`),
+
   /** Upload signed lease document — activates the lease on first signed doc */
   uploadDocument: (leaseId: string, file: File, documentType?: string) => {
     const formData = new FormData();

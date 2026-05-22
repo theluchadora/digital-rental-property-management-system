@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { leasesApi } from "@/lib/api/leases";
 import { LeaseActionButtons } from "@/components/LeaseActionButtons";
+import { PageLoader, StatsGridSkeleton, TableSkeleton } from "@/components/ui/loading-state";
 import type { Lease } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -35,6 +36,7 @@ export default function LeasesPage() {
 
   useEffect(() => {
     async function loadLeases() {
+      setIsLoading(true);
       try {
         const response = await leasesApi.list({
           status: statusFilter !== "ALL" ? statusFilter : undefined,
@@ -43,12 +45,13 @@ export default function LeasesPage() {
         setLeases(data);
       } catch (err) {
         console.error("Failed to load leases:", err);
+        toast({ title: "Failed to load leases", variant: "destructive" });
       } finally {
         setIsLoading(false);
       }
     }
     loadLeases();
-  }, [statusFilter]);
+  }, [statusFilter, toast]);
 
   const filteredLeases = leases;
 
@@ -94,6 +97,11 @@ export default function LeasesPage() {
         )}
       </div>
 
+      {isLoading ? (
+        <div className="mt-6">
+          <StatsGridSkeleton count={4} />
+        </div>
+      ) : (
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           { label: "ANNUAL CONTRACT VALUE", value: `$${annualContractValue.toLocaleString()}.00` },
@@ -112,6 +120,7 @@ export default function LeasesPage() {
           </Card>
         ))}
       </div>
+      )}
 
       <Card className="mt-6 md:mt-8">
         <CardHeader className="flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4">
@@ -141,6 +150,9 @@ export default function LeasesPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {isLoading ? (
+            <TableSkeleton rows={4} cols={7} />
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[700px]">
               <thead>
@@ -203,6 +215,7 @@ export default function LeasesPage() {
               </tbody>
             </table>
           </div>
+          )}
         </CardContent>
       </Card>
 

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { dashboardApi } from "@/lib/api/dashboard";
+import { StatsGridSkeleton } from "@/components/ui/loading-state";
 
 const propertyPerformance: any[] = [];
 
@@ -57,7 +58,11 @@ export default function OwnerDashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {isLoading ? (
+        <div className="mt-6">
+          <StatsGridSkeleton count={5} />
+        </div>
+      ) : (
       <div className="mt-6 grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-5">
         {statsList.map((s, i) => (
           <Card key={i} className="border-l-2 border-l-transparent first:border-l-secondary">
@@ -85,6 +90,7 @@ export default function OwnerDashboard() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Performance Table + Activity */}
       <div className="mt-6 md:mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">

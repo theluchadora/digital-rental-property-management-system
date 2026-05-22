@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency, formatUserName } from "@/lib/utils";
 import { leasesApi } from "@/lib/api/leases";
 import { LeaseActionButtons } from "@/components/LeaseActionButtons";
+import { PageLoader } from "@/components/ui/loading-state";
 import type { Lease } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -55,7 +56,7 @@ export default function LeaseDetailPage() {
   const leaseInvoices = lease?.invoices || [];
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground">Loading lease details...</div>;
+    return <PageLoader label="Loading lease details..." />;
   }
 
   if (!lease) {

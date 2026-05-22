@@ -13,6 +13,7 @@ import { Clock, CheckCircle, Plus, AlertCircle, FileText, X, Trash2, Image as Im
 import FileUploadArea from "@/components/FileUploadArea";
 import { maintenanceApi } from "@/lib/api/maintenance";
 import { unitsApi } from "@/lib/api/units";
+import { PageLoader, StatsGridSkeleton } from "@/components/ui/loading-state";
 import type { MaintenanceRequest, MaintenanceEvidence, RentalUnit } from "@/types/api";
 
 const priorityColors: Record<string, string> = {
@@ -282,6 +283,17 @@ export default function TenantMaintenance() {
   const isDeletable = (status: string) => {
     return status === "CANCELLED" || status === "CLOSED";
   };
+
+  if (isLoading) {
+    return (
+      <div>
+        <StatsGridSkeleton count={5} />
+        <div className="mt-6">
+          <PageLoader label="Loading maintenance requests..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

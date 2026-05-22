@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bed, Bath, Maximize, Filter, X, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { unitsApi } from "@/lib/api/units";
+import { CardGridSkeleton } from "@/components/ui/loading-state";
 import type { Property } from "@/types/api";
 
 export default function TenantBrowsePage() {
@@ -86,11 +87,7 @@ export default function TenantBrowsePage() {
   const hasActiveFilters = location !== "all" || bedrooms !== "all" || minRent || maxRent;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-secondary" />
-      </div>
-    );
+    return <CardGridSkeleton count={6} />;
   }
 
   return (

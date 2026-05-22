@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Clock, CheckCircle, XCircle, Upload, Eye, Filter, Download, FileText, Image as ImageIcon, ChevronLeft, ChevronRight, X, AlertCircle } from "lucide-react";
 import FileUploadArea from "@/components/FileUploadArea";
 import { maintenanceApi } from "@/lib/api/maintenance";
+import { PageLoader, StatsGridSkeleton } from "@/components/ui/loading-state";
 import type { MaintenanceRequest, MaintenanceEvidence } from "@/types/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -207,6 +208,17 @@ export default function OwnerMaintenance() {
     rejected: requests.filter(r => r.status === "REJECTED").length,
     closed: requests.filter(r => r.status === "CLOSED").length,
   };
+
+  if (isLoading) {
+    return (
+      <div>
+        <StatsGridSkeleton count={5} />
+        <div className="mt-6">
+          <PageLoader label="Loading maintenance requests..." />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

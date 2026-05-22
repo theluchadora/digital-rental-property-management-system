@@ -6,6 +6,7 @@ const router = Router();
 
 router.get("/", authenticateToken, leaseController.list);
 router.post("/apply", authenticateToken, authorizeRoles("TENANT"), leaseController.apply);
+router.post("/:id/cancel", authenticateToken, authorizeRoles("TENANT"), leaseController.cancel);
 router.get("/:id", authenticateToken, leaseController.getById);
 router.post("/", authenticateToken, authorizeRoles("OWNER"), leaseController.create);
 router.post("/:id/decision", authenticateToken, authorizeRoles("OWNER"), leaseController.decide);

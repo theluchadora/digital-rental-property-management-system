@@ -3,6 +3,7 @@ import * as notificationsService from "./notificationsService";
 import * as invoicesService from "./invoicesService";
 import * as propertiesService from "./propertiesService";
 import * as announcementsService from "./announcementsService";
+import * as invoiceRepo from "../repositories/invoicesRepository";
 import { NotificationType } from "@prisma/client";
 import * as leaseDocumentsService from "./leaseDocumentsService";
 
@@ -89,6 +90,45 @@ export const addLeaseDocument = async (input: {
     await leasesRepo.updateLease(input.leaseId, { status: "ACTIVE" });
   }
   return doc;
+};
+
+/** Tenant withdraws application before payment (INITIATED or AWAITINGPAYMENT). */
+export const cancelApplication = async (leaseId: string, tenantId: string) => {
+  const lease = await leasesRepo.getLeaseById(leaseId);
+  if (!lease) throw new Error("Lease not found");
+  if (lease.tenantId !== tenantId) throw new Error("Not authorized to cancel this application");
+  if (!["INITIATED", "AWAITINGPAYMENT"].includes(lease.status)) {
+    throw new Error("Only pending applications can be cancelled");
+  }
+
+  const property = await propertiesService.getPropertyById(lease.propertyId);
+
+  const updated = await leasesRepo.updateLease(leaseId, {
+    status: "TERMINATED",
+    terminationReason: "Cancelled by tenant",
+    terminatedAt: new Date(),
+  } as any);
+
+  await propertiesService.updateProperty(lease.propertyId, { status: "VACANT" });
+
+  const invoices = (lease as { invoices?: { id: string; status: string }[] }).invoices ?? [];
+  await Promise.all(
+    invoices
+      .filter((inv) => inv.status === "UNPAID" || inv.status === "OVERDUE")
+      .map((inv) => invoiceRepo.updateInvoice(inv.id, { status: "VOID" } as any))
+  );
+
+  await notificationsService.createNotification({
+    userId: lease.ownerId,
+    type: NotificationType.LEASE,
+    title: "Application cancelled",
+    content: property
+      ? `The tenant cancelled their application for ${property.title}.`
+      : "A tenant cancelled their rental application.",
+    leaseId: lease.id,
+  });
+
+  return updated;
 };
 
 export const terminateLease = async (
