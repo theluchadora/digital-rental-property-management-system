@@ -9,7 +9,7 @@ export type LeaseStatus = "INITIATED" | "AWAITINGPAYMENT" | "DRAFT" | "ACTIVE" |
 export type InvoiceStatus = "UNPAID" | "PENDING_REVIEW" | "PAID" | "OVERDUE" | "VOID" | "REFUNDED";
 export type MaintenanceStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "OWNER_REJECTED" | "TENANT_REJECTED" | "CANCELLED" | "CLOSED";
 export type MaintenancePriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
-export type NotificationType = "MESSAGE" | "ANNOUNCEMENT" | "MAINTENANCE" | "INVOICE" | "SYSTEM";
+export type NotificationType = "MESSAGE" | "ANNOUNCEMENT" | "MAINTENANCE" | "INVOICE" | "SYSTEM" | "LEASE" | "INCIDENT";
 export type BuildingType = "APARTMENT" | "HOUSE" | "COMMERCIAL" | "OFFICE" | "WAREHOUSE";
 export type VehicleType = "SEDAN" | "SUV" | "TRUCK" | "MOTORCYCLE" | "VAN" | "BUS";
 export type TransmissionType = "MANUAL" | "AUTOMATIC";
@@ -281,6 +281,7 @@ export interface Notification {
   id: string;
   userId: string;
   type: NotificationType;
+  title?: string;
   message: string;
   entityType?: string | null;
   entityId?: string | null;
@@ -418,7 +419,7 @@ export interface Property {
   notes?: string;
   
   // Relations
-  photos?: PropertyPhoto[];
+  photos?: (PropertyPhoto | string)[];
   units?: Property[];
   parent?: Property;
   

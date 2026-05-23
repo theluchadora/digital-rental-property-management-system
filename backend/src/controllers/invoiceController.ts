@@ -3,6 +3,8 @@ import { z } from "zod";
 import * as invoicesService from "../services/invoicesService";
 import * as paymentReceiptsService from "../services/paymentReceiptsService";
 import * as leasesRepo from "../repositories/leasesRepository";
+import * as notificationsService from "../services/notificationsService";
+import { NotificationType } from "@prisma/client";
 
 const receiptSchema = z.object({
 	fileUrl: z.string().url(),
@@ -69,6 +71,20 @@ export const uploadReceipt = async (req: Request & { user?: { id: string } }, re
 
 		await invoicesService.updateInvoice(invoiceId, { status: "PENDING_REVIEW" } as any);
 		const invoice = await invoicesService.getInvoice(invoiceId);
+
+		if (invoice) {
+			const lease = await leasesRepo.getLeaseById(invoice.leaseId);
+			if (lease) {
+				await notificationsService.createNotification({
+					userId: lease.ownerId,
+					type: NotificationType.INVOICE,
+					title: "Payment receipt uploaded",
+					content: "A tenant uploaded a payment receipt for your review.",
+					invoiceId,
+					leaseId: lease.id,
+				});
+			}
+		}
 
 		res.status(201).json({ receipt, invoice });
 	} catch (err: any) {

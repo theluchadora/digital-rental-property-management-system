@@ -58,7 +58,13 @@ export const listProperties = async (): Promise<SafeProperty[]> => {
 //wont return units since they are not owned by the owner but by the property, and they are not of type UNIT, so we can filter them out in the repo layer itself
 export const getPropertiesByOwner = async (ownerId: string): Promise<SafeProperty[]> => {
   const props = await propertiesRepo.getPropertiesByOwnerId(ownerId);
-  return props.map(sanitize);
+  const propsWithPhotos = await Promise.all(
+    props.map(async (prop) => {
+      const photos = (await photosService.getPhotosByProperty(prop.id)).map((p) => p.url);
+      return { ...sanitize(prop), photos };
+    })
+  );
+  return propsWithPhotos;
 };
 
 

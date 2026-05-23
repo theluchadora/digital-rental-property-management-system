@@ -10,6 +10,7 @@ import { propertiesApi } from "@/lib/api/properties";
 import { unitsApi } from "@/lib/api/units";
 import { leasesApi } from "@/lib/api/leases";
 import { PageLoader } from "@/components/ui/loading-state";
+import { getPropertyPhotoUrls } from "@/lib/property-photos";
 import type { Property } from "@/types/api";
 
 export default function TenantPropertyDetailPage() {
@@ -44,7 +45,7 @@ export default function TenantPropertyDetailPage() {
   const availableUnits = property?.units?.filter(u => u.status === "VACANT") || [];
   const rentAmount = property?.monthlyRent ? Number(property.monthlyRent) : 0;
   const isWholeProperty = property?.hasUnits === false;
-  const images = property?.photos?.map((photo) => photo.url).filter(Boolean) || [];
+  const images = getPropertyPhotoUrls(property?.photos);
 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -242,8 +243,12 @@ export default function TenantPropertyDetailPage() {
               {availableUnits.map((unit, i) => (
                 <Card key={unit.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="flex flex-col sm:flex-row gap-4 p-4">
-                    {unit.photos?.[0]?.url ? (
-                      <img src={unit.photos[0].url} alt={unit.unitNumber || unit.title} className="h-24 w-full sm:w-32 rounded-lg object-cover" />
+                    {(typeof unit.photos?.[0] === "string" ? unit.photos[0] : unit.photos?.[0]?.url) ? (
+                      <img
+                        src={typeof unit.photos?.[0] === "string" ? unit.photos[0] : unit.photos![0].url}
+                        alt={unit.unitNumber || unit.title}
+                        className="h-24 w-full sm:w-32 rounded-lg object-cover"
+                      />
                     ) : (
                       <div className="h-24 w-full sm:w-32 rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-xs text-muted-foreground">
                         No photo

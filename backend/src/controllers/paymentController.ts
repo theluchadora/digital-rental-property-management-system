@@ -4,6 +4,8 @@ import crypto from "crypto";
 import * as invoicesService from "../services/invoicesService";
 import * as leasesRepo from "../repositories/leasesRepository";
 import * as propertiesService from "../services/propertiesService";
+import * as notificationsService from "../services/notificationsService";
+import { NotificationType } from "@prisma/client";
 import logger from "../utils/logger";
 
 const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY || "";
@@ -79,6 +81,26 @@ async function markInvoicePaid(invoiceId: string) {
   if (lease) {
     await leasesRepo.updateLease(lease.id, { status: "ACTIVE" } as any);
     await propertiesService.updateProperty(lease.propertyId, { status: "OCCUPIED" });
+    try {
+      await notificationsService.createNotification({
+        userId: lease.ownerId,
+        type: NotificationType.INVOICE,
+        title: "Rent payment received",
+        content: "A tenant completed an online rent payment.",
+        invoiceId,
+        leaseId: lease.id,
+      });
+      await notificationsService.createNotification({
+        userId: lease.tenantId,
+        type: NotificationType.INVOICE,
+        title: "Payment successful",
+        content: "Your online rent payment was processed successfully.",
+        invoiceId,
+        leaseId: lease.id,
+      });
+    } catch (err) {
+      logger.error({ err, invoiceId }, "Failed to send payment notifications");
+    }
   }
 }
 

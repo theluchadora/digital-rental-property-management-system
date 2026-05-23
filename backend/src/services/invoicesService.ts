@@ -121,6 +121,9 @@ export const reviewInvoiceStatus = async (
   id: string,
   data: { status: "PAID" | "UNPAID"; reviewNote?: string; reviewerId?: string }
 ) => {
+  const invoice = await invoiceRepo.getInvoiceById(id);
+  if (!invoice) throw new Error("Invoice not found");
+
   const updated = await invoiceRepo.updateInvoice(id, {
     status: data.status,
     reviewNote: data.reviewNote,
@@ -128,6 +131,22 @@ export const reviewInvoiceStatus = async (
     reviewedAt: new Date(),
     paidAt: data.status === "PAID" ? new Date() : undefined,
   } as any);
+
+  try {
+    await notificationsService.createNotification({
+      userId: invoice.tenantId,
+      type: NotificationType.INVOICE,
+      title: data.status === "PAID" ? "Payment confirmed" : "Payment not accepted",
+      content:
+        data.status === "PAID"
+          ? "Your rent payment has been confirmed by the owner."
+          : `Your payment receipt was not accepted.${data.reviewNote ? ` Note: ${data.reviewNote}` : ""}`,
+      invoiceId: id,
+      leaseId: invoice.leaseId,
+    });
+  } catch (err) {
+    console.error("Failed to send invoice review notification", err);
+  }
 
   return sanitize(updated);
 };
@@ -147,13 +166,12 @@ export const generateMonthlyInvoices = async (billingMonth: Date) => {
     normalizedMonth.setDate(1);
 
     try {
-      await invoiceRepo.createInvoice({
-        lease: { connect: { id: lease.id } } as any,
-        tenant: { connect: { id: lease.tenantId } } as any,
+      await createInvoice({
+        leaseId: lease.id,
         billingMonth: normalizedMonth,
-        amountDue: lease.monthlyRent,
+        amountDue: Number(lease.monthlyRent),
         dueDate: new Date(normalizedMonth.getFullYear(), normalizedMonth.getMonth(), 15),
-      } as any);
+      });
       generatedCount += 1;
     } catch {
     console.error("Error caught in invoicesService.ts:", new Error("Unknown error caught"));

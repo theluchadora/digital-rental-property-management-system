@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { propertiesApi } from "@/lib/api/properties";
 import { CardGridSkeleton } from "@/components/ui/loading-state";
+import PropertyCardGallery from "@/components/PropertyCardGallery";
 import type { Property } from "@/types/api";
 
 export default function OwnerPropertiesPage() {
@@ -100,25 +101,13 @@ export default function OwnerPropertiesPage() {
   };
 
   const PropertyCard = ({ property, showOwner = false }: { property: Property; showOwner?: boolean }) => {
-    const firstPhoto = property.photos?.[0]?.url || property.photos?.[0];
     const unitsCount = property.totalUnits || 0;
     
     return (
       <Link to={`/properties/${property.id}`}>
         <Card className="group overflow-hidden transition-shadow hover:shadow-lg cursor-pointer h-full">
           <div className="relative h-48 overflow-hidden">
-            {firstPhoto ? (
-              <img 
-                src={typeof firstPhoto === 'string' ? firstPhoto : firstPhoto.url} 
-                alt={property.title} 
-                loading="lazy" 
-                className="h-full w-full object-cover transition-transform group-hover:scale-105"
-              />
-            ) : (
-              <div className="h-full w-full bg-gradient-to-br from-secondary/20 to-primary/20 flex items-center justify-center">
-                <span className="text-muted-foreground">No Image</span>
-              </div>
-            )}
+            <PropertyCardGallery property={property} />
             <Badge className={`absolute right-3 top-3 text-xs ${
               property.status === "VACANT" ? "bg-green-500 text-white" :
               property.status === "OCCUPIED" ? "bg-secondary text-secondary-foreground" :

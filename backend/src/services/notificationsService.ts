@@ -43,12 +43,12 @@ export const createNotification = async (
     leaseId: input.leaseId,
     messageId: input.messageId,
   });
-    // Send real-time notification to user via WebSocket
-    sendToUser(created.userId, {  
-      for: "NOTIFICATION",
-     ...sanitize(created),
-    });
-  return sanitize(created);
+  const payload = sanitize(created);
+  sendToUser(created.userId, {
+    type: "NEW_NOTIFICATION",
+    data: payload,
+  });
+  return payload;
 };
 
 export const getNotificationsByUserId = async (

@@ -109,11 +109,11 @@ export default function AddPropertyPage() {
   // Should show location fields (not for VEHICLE)
   const showLocationFields = propertyType !== "VEHICLE";
   
-  // Should show building amenities (only for BUILDING)
-  const showBuildingAmenities = propertyType === "BUILDING";
+  // Building-specific details (amenities, year built)
+  const showBuildingDetails = propertyType === "BUILDING";
   
-  // Should show total units field (for BUILDING OR HOUSE with units)
-  const showTotalUnitsField = propertyType === "BUILDING" || (propertyType === "HOUSE" && hasUnits);
+  // Total units count (only when property has multiple units)
+  const showTotalUnitsField = (propertyType === "BUILDING" || propertyType === "HOUSE") && hasUnits;
   
   // Should show unit-specific fields (for HOUSE without units OR directly creating UNIT)
   const showUnitFields = (propertyType === "HOUSE" && !hasUnits) || propertyType === "UNIT";
@@ -166,8 +166,8 @@ export default function AddPropertyPage() {
       payload.totalUnits = Number(totalUnits);
     }
 
-    // Building amenities (only for BUILDING)
-    if (showBuildingAmenities) {
+    // Building amenities
+    if (showBuildingDetails) {
       payload.hasElevator = hasElevator;
       payload.hasParking = hasParking;
       payload.hasGym = hasGym;
@@ -223,6 +223,25 @@ export default function AddPropertyPage() {
     // Validate total units for Building or House with units
     if (showTotalUnitsField && !totalUnits) {
       toast({ title: "Error", description: "Please enter total number of units.", variant: "destructive" });
+      return;
+    }
+
+    if (showVehicleFields && !plateNumber.trim()) {
+      toast({ title: "Error", description: "Please enter the vehicle plate number.", variant: "destructive" });
+      return;
+    }
+
+    if (showUnitFields && propertyType === "HOUSE" && !bedrooms) {
+      toast({ title: "Error", description: "Please enter the number of bedrooms.", variant: "destructive" });
+      return;
+    }
+
+    if (files.length === 0) {
+      toast({
+        title: "Photos required",
+        description: "Add at least one photo so tenants can see your listing.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -433,13 +452,11 @@ export default function AddPropertyPage() {
               </Card>
             )}
 
-            {/* Total Units Field - For BUILDING or HOUSE with units */}
+            {/* Unit count — only when listing has sub-units */}
             {showTotalUnitsField && (
               <Card>
                 <CardHeader>
-                  <CardTitle>
-                    {propertyType === "BUILDING" ? "Building Details" : "Property Details"}
-                  </CardTitle>
+                  <CardTitle>{propertyType === "BUILDING" ? "Unit Configuration" : "Multi-Unit Setup"}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -454,34 +471,38 @@ export default function AddPropertyPage() {
                     />
                     <p className="text-xs text-muted-foreground">
                       {propertyType === "BUILDING" 
-                        ? "Total number of apartments/units in this building"
-                        : "Total number of units in this property (e.g., main house + basement apartment = 2 units)"}
+                        ? "How many apartments/units are in this building? You will add each unit after saving."
+                        : "How many rentable units does this property have?"}
                     </p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
 
-                  {/* Year Built for BUILDING only */}
-                  {propertyType === "BUILDING" && (
-                    <div className="space-y-2">
-                      <Label>Year Built</Label>
-                      <Input 
-                        type="number" 
-                        value={yearBuilt} 
-                        onChange={(e) => setYearBuilt(e.target.value)} 
-                        placeholder="e.g. 2020" 
-                        min={1900} 
-                      />
-                    </div>
-                  )}
-
-                  {/* Building amenities - ONLY for BUILDING type */}
-                  {showBuildingAmenities && (
-                    <div className="flex flex-wrap gap-4 pt-2">
+            {/* Building details — amenities & year (all buildings) */}
+            {showBuildingDetails && (
+              <Card>
+                <CardHeader><CardTitle>Building Details</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Year Built</Label>
+                    <Input 
+                      type="number" 
+                      value={yearBuilt} 
+                      onChange={(e) => setYearBuilt(e.target.value)} 
+                      placeholder="e.g. 2020" 
+                      min={1900} 
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-2 block">Building Amenities</Label>
+                    <div className="flex flex-wrap gap-4">
                       {[
-                        { id: "elevator", label: "Has Elevator", checked: hasElevator, set: setHasElevator },
-                        { id: "parking", label: "Has Parking", checked: hasParking, set: setHasParking },
-                        { id: "gym", label: "Has Gym", checked: hasGym, set: setHasGym },
-                        { id: "pool", label: "Has Pool", checked: hasPool, set: setHasPool },
-                        { id: "security", label: "Has Security", checked: hasSecurity, set: setHasSecurity },
+                        { id: "elevator", label: "Elevator", checked: hasElevator, set: setHasElevator },
+                        { id: "parking", label: "Parking", checked: hasParking, set: setHasParking },
+                        { id: "gym", label: "Gym", checked: hasGym, set: setHasGym },
+                        { id: "pool", label: "Pool", checked: hasPool, set: setHasPool },
+                        { id: "security", label: "Security", checked: hasSecurity, set: setHasSecurity },
                       ].map((item) => (
                         <div key={item.id} className="flex items-center gap-2">
                           <Checkbox
@@ -493,7 +514,7 @@ export default function AddPropertyPage() {
                         </div>
                       ))}
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -802,9 +823,12 @@ export default function AddPropertyPage() {
               </Card>
             )}
 
-            {/* Image Upload */}
+            {/* Image Upload — required for listings */}
             <Card>
-              <CardHeader><CardTitle>Property Images</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Property Images *</CardTitle>
+                <p className="text-sm text-muted-foreground font-normal">Upload photos tenants will see when browsing</p>
+              </CardHeader>
               <CardContent>
                 {imagePreviews.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">

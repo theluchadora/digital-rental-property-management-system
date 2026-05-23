@@ -6,5 +6,6 @@ const router = Router();
 
 router.get("/", authenticateToken, notificationController.getMyNotifications);
 router.post("/read/:id", authenticateToken, notificationController.markNotificationAsRead);
+router.put("/:id/read", authenticateToken, notificationController.markNotificationAsRead);
 
 export default router;

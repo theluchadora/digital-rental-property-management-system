@@ -1,10 +1,16 @@
 import apiClient from "@/lib/api-client";
-import type { Notification, PaginatedResponse } from "@/types/api";
+import type { Notification } from "@/types/api";
 
 export const notificationsApi = {
-  list: (params?: { isRead?: boolean; page?: number; limit?: number }) =>
-    apiClient.get<PaginatedResponse<Notification>>("/notifications", { params }),
+  list: async (params?: { isRead?: boolean }) => {
+    const response = await apiClient.get<Notification[]>("/notifications", {
+      params: params?.isRead !== undefined ? { isRead: String(params.isRead) } : undefined,
+    });
+    return response.data;
+  },
 
-  markRead: (notificationId: string) =>
-    apiClient.put<{ notification: Notification }>(`/notifications/${notificationId}/read`),
+  markRead: async (notificationId: string) => {
+    const response = await apiClient.put<Notification>(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
 };

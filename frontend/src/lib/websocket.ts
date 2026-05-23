@@ -40,8 +40,15 @@ export function connectWebSocket(userId: string) {
   ws.onmessage = (event) => {
     try {
       const payload = JSON.parse(event.data);
+      // Standard envelope: { type, data }
       if (payload.type && listeners.has(payload.type)) {
         listeners.get(payload.type)?.forEach((callback) => callback(payload.data));
+        return;
+      }
+      // Legacy envelope from older notification pushes
+      if (payload.for === "NOTIFICATION" && listeners.has("NEW_NOTIFICATION")) {
+        const { for: _legacy, ...data } = payload;
+        listeners.get("NEW_NOTIFICATION")?.forEach((callback) => callback(data));
       }
     } catch (err) {
       console.error("Error parsing WS message:", err);

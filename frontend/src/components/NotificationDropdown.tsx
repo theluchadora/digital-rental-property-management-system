@@ -7,8 +7,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api/notifications";
 import { messagesApi } from "@/lib/api/messages";
 import { subscribeToEvent } from "@/lib/websocket";
+import { useToast } from "@/hooks/use-toast";
 import type { Notification } from "@/types/api";
-
 
 const iconMap: Record<string, typeof Info> = {
   INVOICE: CreditCard,
@@ -17,6 +17,7 @@ const iconMap: Record<string, typeof Info> = {
   ANNOUNCEMENT: AlertTriangle,
   LEASE: FileText,
   SYSTEM: Settings,
+  INCIDENT: AlertTriangle,
 };
 
 const colorMap: Record<string, string> = {
@@ -26,37 +27,56 @@ const colorMap: Record<string, string> = {
   ANNOUNCEMENT: "text-warning",
   LEASE: "text-secondary",
   SYSTEM: "text-muted-foreground",
+  INCIDENT: "text-destructive",
 };
 
-const routeMap: Record<string, string> = {
-  INVOICE: "/payments",
-  MAINTENANCE: "/maintenance",
-  MESSAGE: "/messages",
-  ANNOUNCEMENT: "/dashboard",
-  LEASE: "/leases",
-  SYSTEM: "/settings",
-};
+function getNotificationRoute(n: Notification): string {
+  const entityId = n.entityId;
+  switch (n.type) {
+    case "INVOICE":
+      return entityId ? `/payments?invoice=${entityId}` : "/payments";
+    case "MAINTENANCE":
+      return "/maintenance";
+    case "MESSAGE":
+      return "/messages";
+    case "ANNOUNCEMENT":
+      return "/dashboard";
+    case "LEASE":
+      return entityId ? `/leases/${entityId}` : "/leases";
+    case "INCIDENT":
+      return "/dashboard";
+    default:
+      return "/dashboard";
+  }
+}
 
 export default function NotificationDropdown() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = subscribeToEvent("NEW_NOTIFICATION", () => {
+    const unsubscribe = subscribeToEvent("NEW_NOTIFICATION", (data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      const n = data as { title?: string; message?: string; content?: string; type?: string };
+      const title = n?.title || "New notification";
+      const body = n?.message || n?.content || "";
+      toast({
+        title,
+        description: body ? String(body).slice(0, 120) : undefined,
+      });
     });
     return unsubscribe;
-  }, [queryClient]);
+  }, [queryClient, toast]);
 
-  const { data: notificationData } = useQuery({
+  const { data: notifications = [] } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => notificationsApi.list({ isRead: false }),
     refetchInterval: false,
   });
 
-  const notifications = notificationData?.data?.data || [];
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const markReadMutation = useMutation({
     mutationFn: notificationsApi.markRead,
@@ -66,8 +86,7 @@ export default function NotificationDropdown() {
   });
 
   const markAllRead = () => {
-    // For now, we manually mark them one by one if there isn't a bulk endpoint
-    notifications.forEach(n => {
+    notifications.forEach((n) => {
       if (!n.isRead) markReadMutation.mutate(n.id);
     });
   };
@@ -91,21 +110,33 @@ export default function NotificationDropdown() {
       }
     }
 
-    navigate(routeMap[n.type] || "/dashboard");
+    navigate(getNotificationRoute(n));
   };
 
   const timeSince = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return "Just now";
+    const minutes = Math.floor(diff / (1000 * 60));
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
     return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  const displayTitle = (n: Notification) => {
+    const t = (n as Notification & { title?: string }).title;
+    if (t) return t;
+    return n.type.replace(/_/g, " ");
+  };
+
+  const displayMessage = (n: Notification) => {
+    return n.message || (n as Notification & { content?: string }).content || "";
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="relative text-muted-foreground hover:text-foreground">
+        <button className="relative text-muted-foreground hover:text-foreground" type="button" aria-label="Notifications">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-secondary text-[10px] text-secondary-foreground">
@@ -127,11 +158,12 @@ export default function NotificationDropdown() {
           {notifications.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
-            notifications.map(n => {
+            notifications.map((n) => {
               const Icon = iconMap[n.type] || Info;
               return (
                 <button
                   key={n.id}
+                  type="button"
                   onClick={() => handleClick(n)}
                   className={`flex w-full gap-3 p-3 text-left transition-colors hover:bg-muted/50 ${
                     !n.isRead ? "bg-secondary/5" : ""
@@ -139,8 +171,8 @@ export default function NotificationDropdown() {
                 >
                   <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${colorMap[n.type] || "text-muted-foreground"}`} />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${!n.isRead ? "font-semibold" : "font-medium"}`}>{n.type.replace("_", " ")}</p>
-                    <p className="text-xs text-muted-foreground truncate">{n.message}</p>
+                    <p className={`text-sm ${!n.isRead ? "font-semibold" : "font-medium"}`}>{displayTitle(n)}</p>
+                    <p className="text-xs text-muted-foreground truncate">{displayMessage(n)}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">{timeSince(n.createdAt)}</p>
                   </div>
                   {!n.isRead && <div className="h-2 w-2 rounded-full bg-secondary mt-1.5 shrink-0" />}

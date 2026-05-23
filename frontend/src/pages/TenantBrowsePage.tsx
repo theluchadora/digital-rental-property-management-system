@@ -21,6 +21,7 @@ export default function TenantBrowsePage() {
   const [minRent, setMinRent] = useState("");
   const [maxRent, setMaxRent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [propertyType, setPropertyType] = useState<"all" | "HOUSE" | "BUILDING" | "VEHICLE">("all");
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -59,13 +60,23 @@ export default function TenantBrowsePage() {
   const filteredUnits = useMemo(() => {
     let result = [...units];
 
+    if (propertyType !== "all") {
+      result = result.filter((u) => u.type === propertyType || u.parent?.type === propertyType);
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(u =>
         u.unitNumber?.toLowerCase().includes(q) ||
         u.title?.toLowerCase().includes(q) ||
-        u.city?.toLowerCase().includes(q)
+        u.city?.toLowerCase().includes(q) ||
+        u.brand?.toLowerCase().includes(q) ||
+        u.model?.toLowerCase().includes(q)
       );
+    }
+
+    if (bedrooms === "3+") {
+      result = result.filter((u) => (u.bedrooms ?? 0) >= 3);
     }
 
     if (sortBy === "price-desc") {
@@ -75,16 +86,17 @@ export default function TenantBrowsePage() {
     }
 
     return result;
-  }, [units, searchQuery, sortBy]);
+  }, [units, searchQuery, sortBy, propertyType, bedrooms]);
 
   const clearFilters = () => {
     setLocation("all");
     setBedrooms("all");
+    setPropertyType("all");
     setMinRent("");
     setMaxRent("");
   };
 
-  const hasActiveFilters = location !== "all" || bedrooms !== "all" || minRent || maxRent;
+  const hasActiveFilters = location !== "all" || bedrooms !== "all" || propertyType !== "all" || minRent || maxRent;
 
   if (isLoading) {
     return <CardGridSkeleton count={6} />;
@@ -97,6 +109,18 @@ export default function TenantBrowsePage() {
         <div className="hidden lg:block w-64 shrink-0">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Filter</h3>
           <div className="mt-4 space-y-6">
+            <div>
+              <label className="text-xs font-semibold uppercase text-muted-foreground">Property Type</label>
+              <Select value={propertyType} onValueChange={(v) => setPropertyType(v as typeof propertyType)}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="HOUSE">Houses</SelectItem>
+                  <SelectItem value="BUILDING">Apartments</SelectItem>
+                  <SelectItem value="VEHICLE">Vehicles</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-xs font-semibold uppercase text-muted-foreground">Location</label>
               <Select value={location} onValueChange={setLocation}>
@@ -205,7 +229,10 @@ export default function TenantBrowsePage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2">
               {filteredUnits.map((unit) => {
-                const firstPhoto = unit.photos?.[0]?.url;
+                const firstPhoto =
+                  typeof unit.photos?.[0] === "string"
+                    ? unit.photos[0]
+                    : unit.photos?.[0]?.url;
                 return (
                   <Card key={unit.id} className="group overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="relative h-44 md:h-52 overflow-hidden">

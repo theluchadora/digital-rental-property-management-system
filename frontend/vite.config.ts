@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => {
           target: env.FRONTEND_DEV_PROXY_TARGET || "http://localhost:5000",
           changeOrigin: true,
         },
+        "/ws": {
+          target: env.FRONTEND_DEV_PROXY_TARGET || "http://localhost:5000",
+          changeOrigin: true,
+          ws: true,
+        },
       },
       hmr: {
         overlay: false,
