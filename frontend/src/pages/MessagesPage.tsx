@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Send, Paperclip, Image as ImageIcon, Edit, ArrowLeft, Search, CheckCircle, X, Flag } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { messagesApi } from "@/lib/api/messages";
 import { notificationsApi } from "@/lib/api/notifications";
+import { usersApi } from "@/lib/api/users";
 import { subscribeToEvent } from "@/lib/websocket";
 import apiClient from "@/lib/api-client";
 import { PageLoader } from "@/components/ui/loading-state";
@@ -29,13 +30,25 @@ export default function MessagesPage() {
   const [newMessage, setNewMessage] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
-  const [searchUser, setSearchUser] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: searchResults = [], isFetching: isSearching } = useQuery({
+    queryKey: ["users", "search", debouncedSearch],
+    queryFn: () => usersApi.search(debouncedSearch),
+    enabled: newChatOpen && debouncedSearch.length >= 2,
+  });
 
   // Queries
   const { data: conversationsResponse, isLoading: conversationsLoading } = useQuery({
@@ -61,10 +74,73 @@ export default function MessagesPage() {
   // Messages are returned DESC by API, we need them ASC for rendering
   const messages = useMemo(() => [...(messagesResponse?.data?.data || [])].reverse(), [messagesResponse]);
 
+  const markConversationRead = useCallback(
+    async (partnerId: string) => {
+      if (!user?.id || !partnerId) return;
+      const readAt = new Date().toISOString();
+      try {
+        await messagesApi.markConversationRead(partnerId);
+        queryClient.setQueryData(["messages", partnerId], (old: unknown) => {
+          const prev = old as { data?: { data?: Message[] } } | undefined;
+          if (!prev?.data?.data) return old;
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              data: prev.data.data.map((m) =>
+                m.receiverId === user.id
+                  ? { ...m, readAt: m.readAt || readAt, isRead: true }
+                  : m
+              ),
+            },
+          };
+        });
+        queryClient.setQueryData(
+          ["conversations"],
+          (old: { data?: { conversations?: Conversation[] } } | undefined) => {
+            if (!old?.data?.conversations) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                conversations: old.data.conversations.map((c) => {
+                  const partner =
+                    c.participantAId === user.id ? c.participantBId : c.participantAId;
+                  if (partner !== partnerId) return c;
+                  if (!c.lastMessage || c.lastMessage.receiverId !== user.id) return c;
+                  return {
+                    ...c,
+                    lastMessage: {
+                      ...c.lastMessage,
+                      readAt: c.lastMessage.readAt || readAt,
+                      isRead: true,
+                    },
+                  };
+                }),
+              },
+            };
+          }
+        );
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      } catch (e) {
+        console.error("Failed to mark conversation as read:", e);
+      }
+    },
+    [queryClient, user?.id]
+  );
+
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (otherUserId) {
+      markConversationRead(otherUserId);
+    }
+  }, [otherUserId, markConversationRead]);
 
   useEffect(() => {
     if (urlUserId && !selectedConvId) {
@@ -99,22 +175,13 @@ export default function MessagesPage() {
       queryClient.invalidateQueries({ queryKey: ["messages", otherUserId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
 
-      if (msg && msg.senderId === otherUserId) {
-        notificationsApi.list({ isRead: false }).then((res) => {
-          const unreadNotifs = res.data?.data || [];
-          const match = unreadNotifs.find(
-            (n) => n.entityType === "MESSAGE" && n.entityId === msg.id
-          );
-          if (match) {
-            notificationsApi.markRead(match.id).then(() => {
-              queryClient.invalidateQueries({ queryKey: ["notifications"] });
-            });
-          }
-        });
+      if (msg?.senderId && msg.senderId !== user?.id) {
+        markConversationRead(msg.senderId);
       }
+      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
     });
     return unsubscribe;
-  }, [otherUserId, queryClient]);
+  }, [otherUserId, queryClient, user?.id, markConversationRead]);
 
   // Mutations
   const sendMessageMutation = useMutation({
@@ -131,6 +198,12 @@ export default function MessagesPage() {
   const handleSelectConv = (id: string) => {
     setSelectedConvId(id);
     setShowChat(true);
+    const conv = conversations.find((c) => c.id === id);
+    if (conv) {
+      const partnerId =
+        conv.participantAId === user?.id ? conv.participantBId : conv.participantAId;
+      markConversationRead(partnerId);
+    }
   };
 
   const uploadFile = async (file: File): Promise<string> => {
@@ -214,12 +287,29 @@ export default function MessagesPage() {
     return conv.participantAId === user?.id ? conv.participantB : conv.participantA;
   };
 
-  // Mocking tenant search for starting a new chat (ideally you'd use a real search API)
-  const handleStartNewChat = () => {
-    // For now we just close it, in a real app you'd fetch users and start a chat
-    toast({ title: "Not implemented", description: "Search API required for new chats" });
-    setNewChatOpen(false);
-  };
+  const startChatWithUser = useCallback(
+    (targetUser: User) => {
+      if (targetUser.id === user?.id) {
+        toast({ title: "Cannot message yourself", variant: "destructive" });
+        return;
+      }
+      const existing = conversations.find(
+        (c) => c.participantAId === targetUser.id || c.participantBId === targetUser.id
+      );
+      setNewChatOpen(false);
+      setSearchQuery("");
+      if (existing) {
+        setSelectedConvId(existing.id);
+        setShowChat(true);
+        navigate(`/messages?userId=${targetUser.id}`);
+      } else {
+        setSelectedConvId(null);
+        setShowChat(true);
+        navigate(`/messages?userId=${targetUser.id}`);
+      }
+    },
+    [conversations, navigate, toast, user?.id]
+  );
 
   return (
     <div className="flex h-[calc(100vh-8rem)] md:h-[calc(100vh-10rem)] gap-0 overflow-hidden rounded-lg border border-border bg-card">
@@ -378,15 +468,47 @@ export default function MessagesPage() {
       </div>
 
       {/* New Chat Dialog */}
-      <Dialog open={newChatOpen} onOpenChange={setNewChatOpen}>
+      <Dialog open={newChatOpen} onOpenChange={(open) => { setNewChatOpen(open); if (!open) setSearchQuery(""); }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>New Conversation</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search user to message (Not implemented)..." className="pl-9" value={searchUser} onChange={e => setSearchUser(e.target.value)} />
+              <Input
+                placeholder="Search by name or email..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+              />
             </div>
-            <Button onClick={handleStartNewChat} className="w-full">Search</Button>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {searchQuery.trim().length < 2 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Type at least 2 characters</p>
+              ) : isSearching ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>
+              ) : searchResults.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+              ) : (
+                searchResults.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => startChatWithUser(u)}
+                    className="flex w-full items-center gap-3 rounded-md p-3 text-left hover:bg-muted transition-colors"
+                  >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground uppercase">
+                      {u.firstName?.[0]}{u.lastName?.[0]}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{u.firstName} {u.lastName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                      <p className="text-[10px] uppercase text-secondary">{u.role}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -45,6 +45,7 @@ export default function TenantPropertyDetailPage() {
   const availableUnits = property?.units?.filter(u => u.status === "VACANT") || [];
   const rentAmount = property?.monthlyRent ? Number(property.monthlyRent) : 0;
   const isWholeProperty = property?.hasUnits === false;
+  const isAvailable = property?.status === "VACANT";
   const images = getPropertyPhotoUrls(property?.photos);
 
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -297,9 +298,15 @@ export default function TenantPropertyDetailPage() {
               <p className="text-xs text-muted-foreground">
                 {property.hasUnits ? `${availableUnits.length} unit(s) available` : "Whole property rental"}
               </p>
-              <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply} disabled={isApplying}>
-                {isApplying ? "APPLYING..." : <><MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW</>}
-              </Button>
+              {isAvailable ? (
+                <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply} disabled={isApplying}>
+                  {isApplying ? "APPLYING..." : <><MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW</>}
+                </Button>
+              ) : (
+                <p className="text-sm text-center text-muted-foreground rounded-md border border-dashed border-border px-3 py-3">
+                  This listing is no longer available for new applications.
+                </p>
+              )}
               <Button variant="outline" className="w-full" onClick={handleSchedule}>
                 <CalendarCheck className="mr-2 h-4 w-4" /> MESSAGE OWNER
               </Button>

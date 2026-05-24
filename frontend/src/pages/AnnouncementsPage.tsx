@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -34,6 +34,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/loading-state";
 import type { Announcement } from "@/types/api";
+import {
+  markAnnouncementAsRead,
+  markAnnouncementsAsRead,
+  isAnnouncementRead,
+} from "@/lib/announcement-read";
 
 function AnnouncementLeaseActions({ leaseId }: { leaseId: string }) {
   const queryClient = useQueryClient();
@@ -108,6 +113,21 @@ export default function AnnouncementsPage() {
 
   const announcements = announcementsData?.data || [];
   const properties = propertiesData?.data || [];
+
+  useEffect(() => {
+    if (announcements.length === 0) return;
+    markAnnouncementsAsRead(announcements.map((a) => a.id));
+    announcementsApi.markNotificationsRead().catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  }, [announcements, queryClient]);
+
+  const handleViewAnnouncement = (announcement: Announcement) => {
+    markAnnouncementAsRead(announcement.id);
+    announcementsApi.markNotificationsRead({ title: announcement.title }).catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  };
 
   const renderAnnouncementActions = (announcement: Announcement) => {
     if (announcement.leaseId) {
@@ -220,14 +240,25 @@ export default function AnnouncementsPage() {
             </CardContent>
           </Card>
         ) : (
-          announcements.map((announcement) => (
-            <Card key={announcement.id} className="overflow-hidden border-l-4 border-l-secondary">
+          announcements.map((announcement) => {
+            const unread = !isAnnouncementRead(announcement.id);
+            return (
+            <Card
+              key={announcement.id}
+              className={`overflow-hidden border-l-4 cursor-pointer transition-colors hover:bg-muted/30 ${
+                unread ? "border-l-secondary bg-secondary/5" : "border-l-muted"
+              }`}
+              onClick={() => handleViewAnnouncement(announcement)}
+            >
               <CardHeader className="bg-muted/30 pb-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Megaphone className="h-4 w-4 text-secondary" />
                       {announcement.title}
+                      {unread && (
+                        <span className="ml-1 h-2 w-2 rounded-full bg-secondary shrink-0" title="Unread" />
+                      )}
                     </CardTitle>
                     <CardDescription className="text-xs">
                       Posted by {announcement.owner?.firstName} {announcement.owner?.lastName} •{" "}
@@ -252,7 +283,8 @@ export default function AnnouncementsPage() {
                 {renderAnnouncementActions(announcement)}
               </CardContent>
             </Card>
-          ))
+          );
+          })
         )}
       </div>
     </div>

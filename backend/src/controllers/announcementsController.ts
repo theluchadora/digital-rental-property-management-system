@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import * as announcementsService from "../services/announcementsService";
 import * as leasesRepo from "../repositories/leasesRepository";
+import * as notificationsRepo from "../repositories/notificationsRepository";
 
 const createSchema = z.object({
   title: z.string().min(1),
@@ -35,6 +36,22 @@ export const list = async (req: Request & { user?: { id: string; role: string } 
   } catch (err: any) {
     console.error("Error caught in announcementsController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to list announcements" });
+  }
+};
+
+export const markRead = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    if (!req.user?.id) return res.status(401).json({ error: "Unauthorized" });
+
+    const title = req.query.title as string | undefined;
+    const count = await notificationsRepo.markAnnouncementNotificationsAsRead(req.user.id, {
+      title,
+    });
+
+    res.json({ count });
+  } catch (err: any) {
+    console.error("Error caught in announcementsController.ts (markRead):", err);
+    res.status(500).json({ error: err.message || "Failed to mark announcements as read" });
   }
 };
 

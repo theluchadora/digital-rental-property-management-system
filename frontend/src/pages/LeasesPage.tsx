@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { leasesApi } from "@/lib/api/leases";
 import { LeaseActionButtons } from "@/components/LeaseActionButtons";
+import TenantApplicantInfo from "@/components/TenantApplicantInfo";
 import { PageLoader, StatsGridSkeleton, TableSkeleton } from "@/components/ui/loading-state";
 import type { Lease } from "@/types/api";
 
@@ -175,13 +176,17 @@ export default function LeasesPage() {
                         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                           {lease.tenant?.firstName?.[0] || ""}{lease.tenant?.lastName?.[0] || "T"}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium">{lease.tenant ? `${lease.tenant.firstName} ${lease.tenant.lastName}` : lease.tenantEmail || "Applicant"}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {lease.status === "ACTIVE" ? `Resident since ${new Date(lease.startDate).getFullYear()}` :
-                             lease.status === "DRAFT" ? "New Applicant" :
-                             lease.status === "EXPIRED" ? "Moved Out" : "Early Exit"}
-                          </p>
+                          {isOwner && (lease.status === "INITIATED" || lease.status === "AWAITINGPAYMENT") ? (
+                            <TenantApplicantInfo tenant={lease.tenant} compact />
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground">
+                              {lease.status === "ACTIVE" ? `Resident since ${new Date(lease.startDate).getFullYear()}` :
+                               lease.status === "DRAFT" ? "New Applicant" :
+                               lease.status === "EXPIRED" ? "Moved Out" : "Early Exit"}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>

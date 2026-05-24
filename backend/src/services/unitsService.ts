@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import * as propertiesRepo from "../repositories/propertiesRepository";
 import * as photosService from "./photosService";
+import {
+  getPropertyIdsWithBlockingLeases,
+  isAvailableForPublicListing,
+} from "./propertyAvailability";
 
 export const listUnits = async (
   where: Prisma.PropertyWhereInput,
@@ -13,18 +17,23 @@ export const listUnits = async (
     propertiesRepo.countProperties(where),
   ]);
 
+  const blockedIds = await getPropertyIdsWithBlockingLeases();
+  const availableItems = items.filter((item) =>
+    isAvailableForPublicListing(item, blockedIds)
+  );
+
   const itemsWithPhotos = await Promise.all(
-    items.map(async (item) => {
-      const photos = await photosService.getPhotosByProperty(item.id);
+    availableItems.map(async (item) => {
+      const photos = (await photosService.getPhotosByProperty(item.id)).map((p) => p.url);
       return { ...item, photos };
     })
   );
 
   return {
     data: itemsWithPhotos,
-    total,
+    total: itemsWithPhotos.length,
     page,
-    totalPages: Math.ceil(total / limit) || 1,
+    totalPages: Math.ceil(itemsWithPhotos.length / limit) || 1,
   };
 };
 

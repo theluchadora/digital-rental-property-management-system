@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDate, formatCurrency, formatUserName } from "@/lib/utils";
 import { leasesApi } from "@/lib/api/leases";
 import { LeaseActionButtons } from "@/components/LeaseActionButtons";
+import TenantApplicantInfo from "@/components/TenantApplicantInfo";
 import { PageLoader } from "@/components/ui/loading-state";
 import type { Lease } from "@/types/api";
 
@@ -147,34 +148,41 @@ export default function LeaseDetailPage() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><User className="h-4 w-4" /> Tenant Information</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                     {lease.tenant?.firstName?.[0] || "?"}{lease.tenant?.lastName?.[0] || "?"}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold">{formatUserName(lease.tenant)}</p>
-                    <p className="text-sm text-muted-foreground">{lease.tenant?.email}</p>
+                    <TenantApplicantInfo tenant={lease.tenant} contactOnly />
                   </div>
                 </div>
                 {lease.tenantId && (
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-secondary" onClick={() => navigate(`/messages?userId=${lease.tenantId}`)}>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-secondary" onClick={() => navigate(`/messages?userId=${lease.tenantId}`)}>
                     <MessageSquare className="h-5 w-5" />
                   </Button>
                 )}
               </div>
+              {isOwner && lease.status === "INITIATED" && (
+                <p className="text-xs text-warning rounded-md bg-warning/10 px-3 py-2">
+                  Review this applicant&apos;s details, then accept or decline below.
+                </p>
+              )}
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Unit Information</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Property Information</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: "Unit", value: lease.unit?.unitIdentifier || "—" },
-                  { label: "Configuration", value: `${lease.unit?.bedrooms || 0} BD / ${lease.unit?.bathrooms || 0} BA` },
-                  { label: "Property", value: lease.unit?.property?.title || "—" },
-                  { label: "City", value: lease.unit?.property?.addressCity || "—" },
+                  { label: "Property", value: lease.property?.title || "—" },
+                  { label: "Type", value: lease.property?.type || "—" },
+                  { label: "Unit", value: lease.property?.unitNumber || lease.unit?.unitIdentifier || "—" },
+                  { label: "City", value: lease.property?.city || "—" },
+                  { label: "Bedrooms", value: lease.property?.bedrooms != null ? String(lease.property.bedrooms) : "—" },
+                  { label: "Bathrooms", value: lease.property?.bathrooms != null ? String(lease.property.bathrooms) : "—" },
                 ].map((item, index) => (
                   <div key={index}>
                     <p className="text-[10px] uppercase text-muted-foreground">{item.label}</p>

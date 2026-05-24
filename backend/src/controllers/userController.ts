@@ -105,10 +105,11 @@ export const remove = async (req: Request & { user?: { id?: string } }, res: Res
   }
 };
 
-export const search = async (req: Request, res: Response) => {
+export const search = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
     const q = (req.query.q as string) || "";
-    const results = await usersService.searchUsers(q);
+    const currentUserId = req.user?.id;
+    const results = await usersService.searchUsers(q, currentUserId);
     res.json(results);
   } catch (err: any) {
     console.error("Error caught in userController.ts:", err);

@@ -16,5 +16,12 @@ export const messagesApi = {
 
   markRead: (messageId: string) =>
     apiClient.put<{ message: Message }>(`/messages/${messageId}/read`),
+
+  markConversationRead: (otherUserId: string) =>
+    apiClient.put<{ count: number }>(
+      "/messages/conversation/read",
+      {},
+      { params: { otherUserId } }
+    ),
 };
 

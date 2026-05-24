@@ -103,6 +103,25 @@ export const getMessageById = async (messageId: string): Promise<Message | null>
   });
 };
 
+/** Mark all messages from otherUserId to userId as read */
+export const markMessagesAsReadBetweenUsers = async (
+  userId: string,
+  otherUserId: string
+): Promise<number> => {
+  const result = await prisma.message.updateMany({
+    where: {
+      senderId: otherUserId,
+      receiverId: userId,
+      OR: [{ readAt: null }, { isRead: false }],
+    },
+    data: {
+      isRead: true,
+      readAt: new Date(),
+    },
+  });
+  return result.count;
+};
+
 export const markMessageAsRead = async (messageId: string): Promise<Message> => {
   return prisma.message.update({
     where: { id: messageId },

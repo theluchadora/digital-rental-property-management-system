@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import * as propertiesRepo from "../repositories/propertiesRepository";
 import * as photosService from "./photosService";
+import {
+  getPropertyIdsWithBlockingLeases,
+  isAvailableForPublicListing,
+} from "./propertyAvailability";
 import { Property as DbProperty } from "@prisma/client";
 
 type SafeProperty = DbProperty & { photos?: string[] };
@@ -80,14 +84,18 @@ export const getUnitsUnderProperty = async (propertyId: string): Promise<SafePro
 //get vacant units under a property, since they are owned by the property and they are of type UNIT, so we can filter them out in the repo layer itself, and then filter by status here
 export const getVacantUnitsUnderProperty = async (propertyId: string): Promise<SafeProperty[]> => {
   const units = await propertiesRepo.getUnitsByPropertyId(propertyId);
-  const vacant = units.filter((unit) => unit.status === "VACANT");
+  const blockedIds = await getPropertyIdsWithBlockingLeases();
+  const vacant = units.filter((unit) => isAvailableForPublicListing(unit, blockedIds));
   return Promise.all(vacant.map(attachPhotos));
 };
 
 //get vacant properties from the main page
 export const getVacantProperties = async (): Promise<SafeProperty[]> => {
   const props = await propertiesRepo.getAllProperties();
-  const vacantProps = props.filter((prop) => prop.status === "VACANT" && prop.type !== "UNIT");
+  const blockedIds = await getPropertyIdsWithBlockingLeases();
+  const vacantProps = props.filter(
+    (prop) => prop.type !== "UNIT" && isAvailableForPublicListing(prop, blockedIds)
+  );
   return Promise.all(vacantProps.map(attachPhotos));
 };
 

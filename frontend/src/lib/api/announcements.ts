@@ -7,4 +7,8 @@ export const announcementsApi = {
 
   create: (data: { title: string; content: string; propertyId?: string }) =>
     apiClient.post<{ announcement: Announcement }>("/announcements", data),
+
+  /** Mark matching ANNOUNCEMENT notifications in the database as read */
+  markNotificationsRead: (params?: { title?: string }) =>
+    apiClient.post<{ count: number }>("/announcements/mark-read", null, { params }),
 };

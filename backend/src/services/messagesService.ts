@@ -77,6 +77,14 @@ export const markRead = async (messageId: string) => {
   return messagesRepository.markMessageAsRead(messageId);
 };
 
+export const markConversationAsRead = async (userId: string, otherUserId: string) => {
+  const count = await messagesRepository.markMessagesAsReadBetweenUsers(userId, otherUserId);
+
+  await notificationsRepository.markMessageNotificationsFromSender(userId, otherUserId);
+
+  return { count };
+};
+
 export const getConversations = async (userId: string) => {
   return messagesRepository.getConversationsForUser(userId);
 };

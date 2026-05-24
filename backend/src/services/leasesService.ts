@@ -4,6 +4,7 @@ import * as invoicesService from "./invoicesService";
 import * as propertiesService from "./propertiesService";
 import * as announcementsService from "./announcementsService";
 import * as invoiceRepo from "../repositories/invoicesRepository";
+import { propertyHasBlockingLease } from "./propertyAvailability";
 import { NotificationType } from "@prisma/client";
 import * as leaseDocumentsService from "./leaseDocumentsService";
 
@@ -272,7 +273,10 @@ export const initiateLease = async (propertyId: string , tenantId: string) => {
      
     if (!property) throw new Error("Property not found");
     if (property.monthlyRent == null) throw new Error("Property monthly rent not set");
-    if (property.status !== "VACANT") throw new Error("Property is not vacant");
+    if (property.status !== "VACANT") throw new Error("Property is not available");
+    if (await propertyHasBlockingLease(propertyId)) {
+      throw new Error("This property already has a pending or active lease");
+    }
 
     const existingLeases = await leasesRepo.getLeasesByTenantId(tenantId);
     const hasActiveOrPending = existingLeases.some(
@@ -299,6 +303,8 @@ export const initiateLease = async (propertyId: string , tenantId: string) => {
     moveOutDate: null,
     updatedAt: new Date(),
   } as any);
+
+  await propertiesService.updateProperty(propertyId, { status: "OCCUPIED" });
 
   await notificationsService.createNotification({
     userId: property.ownerId,

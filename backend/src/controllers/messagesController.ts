@@ -89,6 +89,24 @@ export const send = async (req: any, res: Response) => {
   }
 };
 
+export const markConversationRead = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const otherUserId = req.query.otherUserId as string;
+    if (!otherUserId) {
+      return res.status(400).json({ error: "otherUserId query parameter is required" });
+    }
+
+    const result = await messagesService.markConversationAsRead(userId, otherUserId);
+    res.json(result);
+  } catch (err: any) {
+    console.error("Error caught in messagesController.ts (markConversationRead):", err);
+    res.status(500).json({ error: err.message || "Failed to mark conversation as read" });
+  }
+};
+
 export const markRead = async (req: any, res: Response) => {
   try {
     const userId = req.user?.id;

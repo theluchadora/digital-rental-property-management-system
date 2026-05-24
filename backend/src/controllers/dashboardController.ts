@@ -12,6 +12,17 @@ export const getOwnerStats = async (req: any, res: Response) => {
   }
 };
 
+export const getOwnerOverview = async (req: any, res: Response) => {
+  try {
+    const ownerId = req.user?.id;
+    const data = await dashboardService.getOwnerOverview(ownerId);
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch owner overview" });
+  }
+};
+
 export const getTenantStats = async (req: any, res: Response) => {
   try {
     const tenantId = req.user?.id;
@@ -34,4 +45,4 @@ export const getActivities = async (req: any, res: Response) => {
   }
 };
 
-export default { getOwnerStats, getTenantStats, getActivities };
+export default { getOwnerStats, getOwnerOverview, getTenantStats, getActivities };

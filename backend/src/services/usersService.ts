@@ -71,8 +71,8 @@ export const removeUser = async (id: string): Promise<SafeUser> => {
 	return sanitize(deleted);
 };
 
-export const searchUsers = async (query: string): Promise<SafeUser[]> => {
-	const users = await usersRepo.searchUsers(query);
+export const searchUsers = async (query: string, excludeUserId?: string): Promise<SafeUser[]> => {
+	const users = await usersRepo.searchUsers(query, excludeUserId);
 	return users.map(sanitize);
 };
 

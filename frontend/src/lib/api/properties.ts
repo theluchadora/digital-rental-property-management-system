@@ -10,6 +10,20 @@ export const propertiesApi = {
   },
 
   // Get all properties (paginated API; pass a high limit for portfolio views)
+  /** Alias for getAll — used by announcements/reports */
+  list: async (params?: {
+    page?: number;
+    limit?: number;
+    city?: string;
+    type?: string;
+    status?: string;
+  }) => {
+    const response = await apiClient.get("/properties", {
+      params: { page: 1, limit: 500, ...params },
+    });
+    return { data: response.data };
+  },
+
   getAll: async (params?: {
     page?: number;
     limit?: number;

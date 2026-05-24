@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 import logo from "@/assets/logo.png";
 import {
   LayoutDashboard, Building2, FileText, CreditCard, Wrench,
@@ -8,27 +9,34 @@ import {
   Info, Megaphone, PieChart
 } from "lucide-react";
 
-const ownerNav = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  badgeKey?: "messages" | "announcements" | "leases";
+};
+
+const ownerNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/properties", label: "Properties", icon: Building2 },
-  { to: "/leases", label: "Leases", icon: FileText },
+  { to: "/leases", label: "Leases", icon: FileText, badgeKey: "leases" },
   { to: "/payments", label: "Payments", icon: CreditCard },
   { to: "/maintenance", label: "Maintenance", icon: Wrench },
-  { to: "/announcements", label: "Announcements", icon: Megaphone },
-  { to: "/messages", label: "Messages", icon: Mail },
+  { to: "/announcements", label: "Announcements", icon: Megaphone, badgeKey: "announcements" },
+  { to: "/messages", label: "Messages", icon: Mail, badgeKey: "messages" },
   { to: "/reports", label: "Reports", icon: PieChart },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/report", label: "Report Incidents", icon: Info },
 ];
 
-const tenantNav = [
+const tenantNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/browse", label: "Properties", icon: Search },
-  { to: "/leases", label: "Leases", icon: FileText },
+  { to: "/leases", label: "Leases", icon: FileText, badgeKey: "leases" },
   { to: "/payments", label: "Payments", icon: CreditCard },
   { to: "/maintenance", label: "Maintenance", icon: Wrench },
-  { to: "/announcements", label: "Announcements", icon: Megaphone },
-  { to: "/messages", label: "Messages", icon: Mail },
+  { to: "/announcements", label: "Announcements", icon: Megaphone, badgeKey: "announcements" },
+  { to: "/messages", label: "Messages", icon: Mail, badgeKey: "messages" },
   { to: "/settings", label: "Settings", icon: Settings },
   { to: "/report", label: "Report Incidents", icon: Info },
 ];
@@ -38,6 +46,12 @@ export default function AppSidebar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navItems = user?.role === "OWNER" ? ownerNav : tenantNav;
+  const badges = useSidebarBadges();
+
+  const getBadgeCount = (key?: NavItem["badgeKey"]) => {
+    if (!key) return 0;
+    return badges[key] ?? 0;
+  };
 
   const sidebarContent = (
     <>
@@ -59,6 +73,7 @@ export default function AppSidebar() {
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+          const count = getBadgeCount(item.badgeKey);
           return (
             <Link
               key={item.to}
@@ -70,8 +85,13 @@ export default function AppSidebar() {
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-secondary"
               }`}
             >
-              <item.icon className="h-4 w-4" />
-              {item.label}
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="flex-1 truncate">{item.label}</span>
+              {count > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 text-[10px] font-bold text-secondary-foreground">
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
             </Link>
           );
         })}

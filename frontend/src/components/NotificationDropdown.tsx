@@ -40,7 +40,7 @@ function getNotificationRoute(n: Notification): string {
     case "MESSAGE":
       return "/messages";
     case "ANNOUNCEMENT":
-      return "/dashboard";
+      return "/announcements";
     case "LEASE":
       return entityId ? `/leases/${entityId}` : "/leases";
     case "INCIDENT":
@@ -59,6 +59,7 @@ export default function NotificationDropdown() {
   useEffect(() => {
     const unsubscribe = subscribeToEvent("NEW_NOTIFICATION", (data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
       const n = data as { title?: string; message?: string; content?: string; type?: string };
       const title = n?.title || "New notification";
       const body = n?.message || n?.content || "";
@@ -82,6 +83,7 @@ export default function NotificationDropdown() {
     mutationFn: notificationsApi.markRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
     },
   });
 

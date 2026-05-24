@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, CreditCard, Wrench, Bell, Calendar, Building2, ArrowRight, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,14 +9,13 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { announcementsApi } from "@/lib/api/announcements";
 import { dashboardApi } from "@/lib/api/dashboard";
-
 import { Announcement } from "@/types/api";
+import { markAnnouncementAsRead } from "@/lib/announcement-read";
 import { StatsGridSkeleton, CardGridSkeleton } from "@/components/ui/loading-state";
 
 export default function TenantDashboard() {
   const { user } = useAuth();
-  const activeLease = null as any; // TODO: fetch active lease
-
+  const queryClient = useQueryClient();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +34,8 @@ export default function TenantDashboard() {
     queryFn: dashboardApi.getTenantStats,
   });
 
+  const activeLease = statsData?.activeLease ?? null;
+
   useEffect(() => {
     announcementsApi.list({ limit: 20 })
       .then((res) => {
@@ -51,7 +52,10 @@ export default function TenantDashboard() {
     if (!readAnnouncementIds.includes(a.id)) {
       const updated = [...readAnnouncementIds, a.id];
       setReadAnnouncementIds(updated);
-      localStorage.setItem("read_announcements", JSON.stringify(updated));
+      markAnnouncementAsRead(a.id);
+      announcementsApi.markNotificationsRead({ title: a.title }).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     }
   };
 
@@ -90,7 +94,11 @@ export default function TenantDashboard() {
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Payment Due</p>
               <p className="text-sm md:text-lg font-bold text-destructive">
-                In {statsData?.daysUntilDue ?? "—"} Days
+                {statsData?.daysUntilDue != null
+                  ? statsData.daysUntilDue <= 0
+                    ? "Due now"
+                    : `In ${statsData.daysUntilDue} days`
+                  : "—"}
               </p>
               <p className="text-xs text-muted-foreground hidden sm:block">Upcoming Invoice</p>
             </div>
@@ -137,21 +145,47 @@ export default function TenantDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {[
-              { label: "Property", value: activeLease?.unit?.property?.title || "—" },
-              { label: "Unit", value: activeLease?.unit?.unitIdentifier || "—" },
-              { label: "Monthly Rent", value: activeLease ? `$${activeLease.monthlyRent.toLocaleString()}` : "—" },
-              { label: "Security Deposit", value: activeLease?.depositAmount ? `$${activeLease.depositAmount.toLocaleString()}` : "—" },
-              { label: "Lease Term", value: activeLease ? `${new Date(activeLease.startDate).toLocaleDateString()} — ${new Date(activeLease.endDate).toLocaleDateString()}` : "—" },
+              {
+                label: "Property",
+                value: activeLease?.property?.title || "—",
+              },
+              {
+                label: "Location",
+                value:
+                  [activeLease?.property?.city, activeLease?.property?.address]
+                    .filter(Boolean)
+                    .join(", ") || "—",
+              },
+              {
+                label: "Monthly Rent",
+                value: activeLease
+                  ? `$${activeLease.monthlyRent.toLocaleString()}`
+                  : "—",
+              },
+              {
+                label: "Security Deposit",
+                value: activeLease?.depositAmount
+                  ? `$${activeLease.depositAmount.toLocaleString()}`
+                  : "—",
+              },
+              {
+                label: "Lease Term",
+                value: activeLease
+                  ? `${new Date(activeLease.startDate).toLocaleDateString()} — ${new Date(activeLease.endDate).toLocaleDateString()}`
+                  : "—",
+              },
             ].map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{item.label}</span>
                 <span className="font-medium text-right">{item.value}</span>
               </div>
             ))}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Status</span>
-              <Badge className="bg-secondary/10 text-secondary">ACTIVE</Badge>
-            </div>
+            {activeLease && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <Badge className="bg-secondary/10 text-secondary">{activeLease.status}</Badge>
+              </div>
+            )}
             {activeLease ? (
               <Link to={`/leases/${activeLease.id}`}>
                 <Button className="w-full mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90" size="sm">

@@ -62,19 +62,23 @@ export const deleteUser = async (id: string): Promise<User> => {
 };
 
 
-//search user by name 
-export const searchUsers = async (query: string): Promise<User[]> => {
-   const firstHalf = query.split(" ")[0];
-   const secondHalf = query.split(" ")[1] || "";
+// Search users by name or email
+export const searchUsers = async (query: string, excludeUserId?: string): Promise<User[]> => {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
   return prisma.user.findMany({
     where: {
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      accountStatus: "ACTIVE",
       OR: [
-        { firstName: { contains: firstHalf, mode: "insensitive" } },
-        { lastName: { contains: firstHalf, mode: "insensitive" } },
-        { firstName: { contains: secondHalf, mode: "insensitive" } },
-        { lastName: { contains: secondHalf, mode: "insensitive" } },
+        { email: { contains: trimmed, mode: "insensitive" } },
+        { firstName: { contains: trimmed, mode: "insensitive" } },
+        { lastName: { contains: trimmed, mode: "insensitive" } },
+        { phoneNumber: { contains: trimmed, mode: "insensitive" } },
       ],
     },
+    take: 20,
     orderBy: { createdAt: "desc" },
   });
-}
+};
