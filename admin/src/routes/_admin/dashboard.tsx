@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Users,
@@ -9,6 +9,9 @@ import {
   Bell,
   TrendingUp,
   AlertTriangle,
+  ShieldAlert,
+  Activity,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Card,
@@ -32,6 +35,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import { formatDistanceToNow } from "date-fns";
 import { statsApi } from "@/api/services";
 import { PageHeader } from "@/components/admin/PageHeader";
 
@@ -47,7 +51,7 @@ const COLORS = [
 ];
 
 function DashboardPage() {
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading } = useQuery({
     queryKey: ["stats"],
     queryFn: statsApi.get,
   });
@@ -58,18 +62,21 @@ function DashboardPage() {
       value: stats?.totalUsers,
       icon: Users,
       hint: `${stats?.totalOwners ?? 0} owners · ${stats?.totalTenants ?? 0} tenants`,
+      accent: "from-blue-500/10 to-transparent",
     },
     {
       label: "Properties",
       value: stats?.totalProperties,
       icon: Building2,
-      hint: "Across portfolio",
+      hint: "Root listings on platform",
+      accent: "from-emerald-500/10 to-transparent",
     },
     {
       label: "Active Leases",
       value: stats?.activeLeases,
       icon: FileText,
-      hint: `${stats?.totalLeases ?? 0} total`,
+      hint: `${stats?.totalLeases ?? 0} total leases`,
+      accent: "from-violet-500/10 to-transparent",
     },
     {
       label: "Revenue (paid)",
@@ -78,56 +85,96 @@ function DashboardPage() {
           ? `${stats.totalRevenue.toLocaleString()} ETB`
           : "—",
       icon: Receipt,
-      hint: "All-time",
+      hint: "All-time collected",
+      accent: "from-amber-500/10 to-transparent",
     },
     {
       label: "Pending Invoices",
       value: stats?.pendingInvoices,
       icon: TrendingUp,
-      hint: "Need review",
+      hint: "Unpaid · overdue · review",
+      accent: "from-orange-500/10 to-transparent",
     },
     {
       label: "Open Maintenance",
       value: stats?.openMaintenance,
       icon: Wrench,
       hint: "OPEN + IN_PROGRESS",
+      accent: "from-rose-500/10 to-transparent",
     },
     {
-      label: "Unread Alerts",
-      value: stats?.unreadNotifications,
-      icon: Bell,
-      hint: "Incidents & helps",
+      label: "Open Incidents",
+      value: stats?.openIncidents,
+      icon: ShieldAlert,
+      hint: "Needs admin review",
+      accent: "from-red-500/10 to-transparent",
     },
     {
       label: "Suspended Users",
-      value: 0,
+      value: stats?.suspendedUsers,
       icon: AlertTriangle,
-      hint: "Action required",
+      hint: "Access restricted",
+      accent: "from-slate-500/10 to-transparent",
     },
   ];
 
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Overview of platform activity and key metrics."
+        title="Command Center"
+        description="Live platform health, revenue, and operational load."
       />
       <div className="space-y-6 p-6">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-gradient-to-r from-primary/5 via-card to-secondary/5 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <span className="font-medium">API</span>
+            <span className="text-muted-foreground">
+              {stats?.systemHealth?.api ?? (isLoading ? "…" : "healthy")}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <span className="font-medium">Database</span>
+            <span className="text-muted-foreground">
+              {stats?.systemHealth?.database ?? (isLoading ? "…" : "healthy")}
+            </span>
+          </div>
+          <div className="ml-auto flex gap-2 text-sm">
+            <Link
+              to="/reports"
+              className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:opacity-90"
+            >
+              View reports
+            </Link>
+            <Link
+              to="/users"
+              className="rounded-md border px-3 py-1.5 font-medium hover:bg-muted"
+            >
+              Manage users
+            </Link>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((c) => (
-            <Card key={c.label}>
+            <Card
+              key={c.label}
+              className={`overflow-hidden border-border/70 bg-gradient-to-br ${c.accent}`}
+            >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">{c.label}</p>
-                    <p className="mt-2 text-2xl font-semibold">
+                    <p className="mt-2 text-2xl font-semibold tabular-nums">
                       {c.value ?? "—"}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {c.hint}
                     </p>
                   </div>
-                  <div className="rounded-md bg-secondary/15 p-2 text-secondary">
+                  <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
                     <c.icon className="h-5 w-5" />
                   </div>
                 </div>
@@ -166,6 +213,40 @@ function DashboardPage() {
 
           <Card>
             <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Recent activity
+              </CardTitle>
+              <CardDescription>Latest signups, leases, tickets</CardDescription>
+            </CardHeader>
+            <CardContent className="max-h-72 space-y-3 overflow-y-auto pr-1">
+              {(stats?.recentActivity ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">No activity yet.</p>
+              ) : (
+                stats?.recentActivity?.map((item) => (
+                  <div
+                    key={`${item.type}-${item.id}`}
+                    className="rounded-lg border bg-muted/30 px-3 py-2"
+                  >
+                    <p className="text-sm font-medium leading-snug">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.subtitle} ·{" "}
+                      {formatDistanceToNow(new Date(item.at), {
+                        addSuffix: true,
+                      })}
+                    </p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
               <CardTitle>Users by Role</CardTitle>
               <CardDescription>Distribution</CardDescription>
             </CardHeader>
@@ -191,30 +272,50 @@ function DashboardPage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Maintenance by Status</CardTitle>
+              <CardDescription>Across all properties</CardDescription>
+            </CardHeader>
+            <CardContent className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats?.maintenanceByStatus ?? []}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="oklch(0.9 0.01 250)"
+                  />
+                  <XAxis dataKey="status" stroke="oklch(0.5 0.02 250)" />
+                  <YAxis stroke="oklch(0.5 0.02 250)" />
+                  <Tooltip />
+                  <Bar
+                    dataKey="count"
+                    fill="oklch(0.83 0.09 215)"
+                    radius={[6, 6, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Maintenance by Status</CardTitle>
-            <CardDescription>Across all properties</CardDescription>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats?.maintenanceByStatus ?? []}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="oklch(0.9 0.01 250)"
-                />
-                <XAxis dataKey="status" stroke="oklch(0.5 0.02 250)" />
-                <YAxis stroke="oklch(0.5 0.02 250)" />
-                <Tooltip />
-                <Bar
-                  dataKey="count"
-                  fill="oklch(0.83 0.09 215)"
-                  radius={[6, 6, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+            <div className="flex items-center gap-3">
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium">Unread notifications</p>
+                <p className="text-sm text-muted-foreground">
+                  {stats?.unreadNotifications ?? 0} system-wide alerts
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/notifications"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Open notifications →
+            </Link>
           </CardContent>
         </Card>
       </div>

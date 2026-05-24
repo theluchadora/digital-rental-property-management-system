@@ -24,8 +24,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setUser(authStorage.getUser());
-    setLoading(false);
+    const stored = authStorage.getUser();
+    if (!stored) {
+      setLoading(false);
+      return;
+    }
+    authApi
+      .me()
+      .then((u) => {
+        if (u.role !== "ADMIN") {
+          authStorage.clearSession();
+          setUser(null);
+        } else {
+          authStorage.setSession(
+            authStorage.getAccessToken() ?? "session",
+            authStorage.getRefreshToken() ?? "session",
+            u,
+          );
+          setUser(u);
+        }
+      })
+      .catch(() => {
+        authStorage.clearSession();
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -37,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    authApi.logout().catch(() => undefined);
     authStorage.clearSession();
     setUser(null);
   };

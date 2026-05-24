@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import usersService from "../services/usersService";
+import { mapAdminUser } from "../utils/adminMappers";
 
 
 export const register = async (req: Request, res: Response) => {
@@ -44,7 +45,12 @@ export const login = async (req: Request, res: Response) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    return res.json({ message: "Login successful", user });
+    return res.json({
+      message: "Login successful",
+      user: mapAdminUser(user as Parameters<typeof mapAdminUser>[0]),
+      accessToken: token,
+      refreshToken: token,
+    });
   } catch (err: any) {
     console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Login failed" });
@@ -57,7 +63,8 @@ export const getMe = async (req: any, res: Response) => {
     if (!id) return res.status(401).json({ error: "Unauthorized" });
 
     const user = await usersService.getUser(id);
-    res.json(user);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(mapAdminUser(user as Parameters<typeof mapAdminUser>[0]));
   } catch (err: any) {
     console.error("Error caught in userController.ts:", err);
     res.status(500).json({ error: err.message || "Failed to fetch user" });

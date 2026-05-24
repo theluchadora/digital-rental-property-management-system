@@ -29,6 +29,7 @@ import incidentsRoutes from "./routes/incidentsRoutes";
 import unitsRoutes from "./routes/unitsRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import messagesRoutes from "./routes/messagesRoutes";
+import adminRoutes from "./routes/adminRoutes";
 
 const app = express();
 app.disable("etag");
@@ -99,6 +100,7 @@ router.use("/incidents", incidentsRoutes);
 router.use("/units", unitsRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/messages", messagesRoutes);
+router.use("/admin", adminRoutes);
 
 // payment routes
 router.post("/payments/initialize", initializePayment);

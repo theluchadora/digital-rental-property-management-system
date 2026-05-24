@@ -12,12 +12,14 @@ import {
   ShieldAlert,
   ChevronLeft,
   Menu,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/components/ui/sidebar";
 
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Users", url: "/users", icon: Users },
   { title: "Properties", url: "/properties", icon: Building2 },
   { title: "Leases", url: "/leases", icon: FileText },

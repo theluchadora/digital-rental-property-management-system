@@ -20,6 +20,8 @@ import { Route as AdminMessagesRouteImport } from "./routes/_admin/messages";
 import { Route as AdminMaintenanceRouteImport } from "./routes/_admin/maintenance";
 import { Route as AdminLeasesRouteImport } from "./routes/_admin/leases";
 import { Route as AdminDashboardRouteImport } from "./routes/_admin/dashboard";
+import { Route as AdminIncidentsRouteImport } from "./routes/_admin/incidents";
+import { Route as AdminReportsRouteImport } from "./routes/_admin/reports";
 
 const LoginRoute = LoginRouteImport.update({
   id: "/login",
@@ -75,11 +77,23 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
   path: "/dashboard",
   getParentRoute: () => AdminRoute,
 } as any);
+const AdminIncidentsRoute = AdminIncidentsRouteImport.update({
+  id: "/incidents",
+  path: "/incidents",
+  getParentRoute: () => AdminRoute,
+} as any);
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: "/reports",
+  path: "/reports",
+  getParentRoute: () => AdminRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
   "/login": typeof LoginRoute;
   "/dashboard": typeof AdminDashboardRoute;
+  "/incidents": typeof AdminIncidentsRoute;
+  "/reports": typeof AdminReportsRoute;
   "/leases": typeof AdminLeasesRoute;
   "/maintenance": typeof AdminMaintenanceRoute;
   "/messages": typeof AdminMessagesRoute;
@@ -92,6 +106,8 @@ export interface FileRoutesByTo {
   "/": typeof IndexRoute;
   "/login": typeof LoginRoute;
   "/dashboard": typeof AdminDashboardRoute;
+  "/incidents": typeof AdminIncidentsRoute;
+  "/reports": typeof AdminReportsRoute;
   "/leases": typeof AdminLeasesRoute;
   "/maintenance": typeof AdminMaintenanceRoute;
   "/messages": typeof AdminMessagesRoute;
@@ -106,6 +122,8 @@ export interface FileRoutesById {
   "/_admin": typeof AdminRouteWithChildren;
   "/login": typeof LoginRoute;
   "/_admin/dashboard": typeof AdminDashboardRoute;
+  "/_admin/incidents": typeof AdminIncidentsRoute;
+  "/_admin/reports": typeof AdminReportsRoute;
   "/_admin/leases": typeof AdminLeasesRoute;
   "/_admin/maintenance": typeof AdminMaintenanceRoute;
   "/_admin/messages": typeof AdminMessagesRoute;
@@ -120,6 +138,8 @@ export interface FileRouteTypes {
     | "/"
     | "/login"
     | "/dashboard"
+    | "/incidents"
+    | "/reports"
     | "/leases"
     | "/maintenance"
     | "/messages"
@@ -132,6 +152,8 @@ export interface FileRouteTypes {
     | "/"
     | "/login"
     | "/dashboard"
+    | "/incidents"
+    | "/reports"
     | "/leases"
     | "/maintenance"
     | "/messages"
@@ -239,11 +261,27 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof AdminDashboardRouteImport;
       parentRoute: typeof AdminRoute;
     };
+    "/_admin/incidents": {
+      id: "/_admin/incidents";
+      path: "/incidents";
+      fullPath: "/incidents";
+      preLoaderRoute: typeof AdminIncidentsRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
+    "/_admin/reports": {
+      id: "/_admin/reports";
+      path: "/reports";
+      fullPath: "/reports";
+      preLoaderRoute: typeof AdminReportsRouteImport;
+      parentRoute: typeof AdminRoute;
+    };
   }
 }
 
 interface AdminRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute;
+  AdminIncidentsRoute: typeof AdminIncidentsRoute;
+  AdminReportsRoute: typeof AdminReportsRoute;
   AdminLeasesRoute: typeof AdminLeasesRoute;
   AdminMaintenanceRoute: typeof AdminMaintenanceRoute;
   AdminMessagesRoute: typeof AdminMessagesRoute;
@@ -255,6 +293,8 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminIncidentsRoute: AdminIncidentsRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminLeasesRoute: AdminLeasesRoute,
   AdminMaintenanceRoute: AdminMaintenanceRoute,
   AdminMessagesRoute: AdminMessagesRoute,

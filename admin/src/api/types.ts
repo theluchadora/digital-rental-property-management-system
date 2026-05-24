@@ -172,16 +172,39 @@ export interface AdminStats {
   totalUsers: number;
   totalOwners: number;
   totalTenants: number;
+  totalAdmins?: number;
+  suspendedUsers?: number;
   totalProperties: number;
   totalLeases: number;
   activeLeases: number;
   totalRevenue: number;
   pendingInvoices: number;
   openMaintenance: number;
+  openIncidents?: number;
   unreadNotifications: number;
   monthlyRevenue: { month: string; revenue: number }[];
   usersByRole: { role: string; count: number }[];
   maintenanceByStatus: { status: string; count: number }[];
+  systemHealth?: { database: string; api: string; monthStart: string };
+  recentActivity?: {
+    type: "user" | "lease" | "maintenance";
+    id: string;
+    title: string;
+    subtitle: string;
+    at: string;
+  }[];
+}
+
+export interface ReportsOverview {
+  revenueThisMonth: number;
+  paidInvoicesThisMonth: number;
+  revenueYtd: number;
+  outstandingAmount: number;
+  outstandingCount: number;
+  leasesByStatus: { status: string; count: number }[];
+  propertiesByStatus: { status: string; count: number }[];
+  invoicesByStatus: { status: string; count: number }[];
+  topOwnersByRevenue: { name: string; revenue: number }[];
 }
 
 export interface IncidentEvidence {

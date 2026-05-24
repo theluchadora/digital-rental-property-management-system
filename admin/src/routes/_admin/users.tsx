@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, MoreHorizontal, Ban, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -64,7 +64,7 @@ import { StatusBadge } from "@/components/admin/StatusBadge";
 import { FloatingUserDetails } from "@/components/admin/FloatingUserDetails";
 import { usersApi } from "@/api/services";
 import { format } from "date-fns";
-import type { User, PaginatedResponse } from "@/api/types";
+import type { User } from "@/api/types";
 import { Download, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_admin/users")({
@@ -74,12 +74,21 @@ export const Route = createFileRoute("/_admin/users")({
 
 function UsersPage() {
   const qc = useQueryClient();
-  const { data = [] } = useQuery({
-    queryKey: ["users"],
-    queryFn: usersApi.list,
-  });
   const [search, setSearch] = useState("");
   const [role, setRole] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+
+  const { data: usersResult, isLoading, isError } = useQuery({
+    queryKey: ["users", role, statusFilter, search],
+    queryFn: () =>
+      usersApi.list({
+        role,
+        status: statusFilter,
+        q: search,
+      }),
+  });
+  const users = usersResult?.users ?? [];
+  const totalUsers = usersResult?.total ?? 0;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -88,6 +97,7 @@ function UsersPage() {
     firstName: "",
     lastName: "",
     email: "",
+    phoneNumber: "+251900000001",
     password: "",
   });
 
@@ -148,25 +158,18 @@ function UsersPage() {
       qc.invalidateQueries({ queryKey: ["users"] });
       toast.success("Admin created successfully");
       setIsInviteOpen(false);
-      setAdminForm({ firstName: "", lastName: "", email: "", password: "" });
+      setAdminForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneNumber: "+251900000001",
+        password: "",
+      });
     },
     onError: () => toast.error("Failed to create admin"),
   });
 
-  const filtered = useMemo(() => {
-    const s = search.toLowerCase();
-    const usersList = Array.isArray(data)
-      ? data
-      : (data as unknown as PaginatedResponse<User>).data || [];
-    return usersList.filter(
-      (u) =>
-        (role === "ALL" || u.role === role) &&
-        (u.firstName.toLowerCase().includes(s) ||
-          u.lastName.toLowerCase().includes(s) ||
-          u.email.toLowerCase().includes(s) ||
-          u.phoneNumber?.toLowerCase().includes(s)),
-    );
-  }, [data, search, role]);
+  const filtered = users;
 
   const allSelected =
     filtered.length > 0 && selectedIds.size === filtered.length;
@@ -231,8 +234,8 @@ function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users"
-        description="Owners, tenants and admins on the platform."
+        title="All Users"
+        description="Every account on the platform — owners, tenants, and admins."
       />
       <div className="space-y-4 p-6 pb-24 relative">
         <div className="flex flex-wrap items-center gap-3">
@@ -243,13 +246,24 @@ function UsersPage() {
           />
           <Select value={role} onValueChange={setRole}>
             <SelectTrigger className="w-44">
-              <SelectValue />
+              <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All roles</SelectItem>
               <SelectItem value="OWNER">Owners</SelectItem>
               <SelectItem value="TENANT">Tenants</SelectItem>
               <SelectItem value="ADMIN">Admins</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All statuses</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="SUSPENDED">Suspended</SelectItem>
             </SelectContent>
           </Select>
 
@@ -264,7 +278,9 @@ function UsersPage() {
 
           <div className="ml-auto flex items-center gap-2">
             <span className="text-sm text-muted-foreground mr-2">
-              {filtered.length} results
+              {isLoading
+                ? "Loading…"
+                : `${filtered.length} shown · ${totalUsers} total`}
             </span>
             <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
               <DialogTrigger asChild>
@@ -326,6 +342,20 @@ function UsersPage() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="phoneNumber">Phone</Label>
+                      <Input
+                        id="phoneNumber"
+                        required
+                        value={adminForm.phoneNumber}
+                        onChange={(e) =>
+                          setAdminForm({
+                            ...adminForm,
+                            phoneNumber: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="password">Temporary Password</Label>
                       <Input
                         id="password"
@@ -378,7 +408,30 @@ function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((u) => {
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    Loading all users…
+                  </TableCell>
+                </TableRow>
+              )}
+              {isError && !isLoading && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-destructive">
+                    Could not load users. Sign in as admin and ensure the API is running.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
+                    No users match your filters.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading &&
+                !isError &&
+                filtered.map((u) => {
                 const isSelected = selectedIds.has(u.id);
                 return (
                   <TableRow
@@ -499,16 +552,6 @@ function UsersPage() {
                   </TableRow>
                 );
               })}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No users found
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
         </Card>

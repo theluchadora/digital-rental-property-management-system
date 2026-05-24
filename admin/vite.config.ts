@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       port: Number(env.FRONTEND_DEV_PORT || "5173"),
       proxy: {
         "/api": {
-          target: env.FRONTEND_DEV_PROXY_TARGET || "http://localhost:3000",
+          target: env.FRONTEND_DEV_PROXY_TARGET || "http://localhost:5000",
           changeOrigin: true,
         },
       },

@@ -5,6 +5,7 @@ import { authStorage } from "@/lib/auth-storage";
 const apiClient = axios.create({
   baseURL: appConfig.apiBaseUrl,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 apiClient.interceptors.request.use((config) => {

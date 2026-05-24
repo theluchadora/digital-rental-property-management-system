@@ -2,8 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 export const authenticateToken = (req: any, res: Response, next: NextFunction) => {
-  // Extract token from cookies
-  const token = req.cookies.token;
+  const bearer = req.headers.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.slice(7)
+    : null;
+  const token = req.cookies?.token || bearer;
 
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: No token provided" });

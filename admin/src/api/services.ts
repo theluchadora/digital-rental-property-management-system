@@ -9,22 +9,55 @@ import type {
   Message,
   Notification,
   AdminStats,
+  ReportsOverview,
   PaginatedResponse,
   IncidentReport,
 } from "./types";
 
 export const authApi = {
   async login(email: string, password: string): Promise<AuthResponse> {
-    return (
-      await apiClient.post<AuthResponse>("/auth/login", { email, password })
-    ).data;
+    const res = await apiClient.post<{
+      user: User;
+      accessToken?: string;
+      refreshToken?: string;
+      message?: string;
+    }>("/users/login", { email, password });
+    const { user, accessToken, refreshToken } = res.data;
+    return {
+      user,
+      accessToken: accessToken ?? "session",
+      refreshToken: refreshToken ?? "session",
+    };
+  },
+  async me(): Promise<User> {
+    const res = await apiClient.get<User>("/users/me");
+    return res.data;
+  },
+  async logout(): Promise<void> {
+    await apiClient.post("/users/logout");
   },
 };
 
 export const usersApi = {
-  list: async (): Promise<User[]> => {
-    const res = await apiClient.get<PaginatedResponse<User>>("/admin/users");
-    return Array.isArray(res.data) ? res.data : res.data.data || [];
+  list: async (params?: {
+    role?: string;
+    status?: string;
+    q?: string;
+  }): Promise<{ users: User[]; total: number }> => {
+    const res = await apiClient.get<PaginatedResponse<User>>("/admin/users", {
+      params: {
+        ...(params?.role && params.role !== "ALL" ? { role: params.role } : {}),
+        ...(params?.status && params.status !== "ALL"
+          ? { status: params.status }
+          : {}),
+        ...(params?.q?.trim() ? { q: params.q.trim() } : {}),
+      },
+    });
+    const users = Array.isArray(res.data) ? res.data : res.data.data || [];
+    const total = Array.isArray(res.data)
+      ? res.data.length
+      : (res.data.total ?? users.length);
+    return { users, total };
   },
   remove: async (id: string): Promise<void> => {
     await apiClient.delete(`/admin/users/${id}`);
@@ -122,7 +155,7 @@ export const invoicesApi = {
 export const maintenanceApi = {
   list: async (): Promise<MaintenanceRequest[]> => {
     const res = await apiClient.get<PaginatedResponse<MaintenanceRequest>>(
-      "/maintenance-requests",
+      "/admin/maintenance",
     );
     return Array.isArray(res.data) ? res.data : res.data.data || [];
   },
@@ -156,7 +189,14 @@ export const notificationsApi = {
 
 export const statsApi = {
   get: async (): Promise<AdminStats> => {
-    const res = await apiClient.get<AdminStats>("/dashboard/owner/stats");
+    const res = await apiClient.get<AdminStats>("/admin/stats");
+    return res.data;
+  },
+};
+
+export const reportsApi = {
+  overview: async (): Promise<ReportsOverview> => {
+    const res = await apiClient.get<ReportsOverview>("/admin/reports/overview");
     return res.data;
   },
 };
