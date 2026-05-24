@@ -14,6 +14,17 @@ import { CardGridSkeleton } from "@/components/ui/loading-state";
 import PropertyCardGallery from "@/components/PropertyCardGallery";
 import type { Property } from "@/types/api";
 
+/** Normalize property list from API (raw array or paginated { data }). */
+function parsePropertyList(response: unknown): Property[] {
+  if (Array.isArray(response)) return response;
+  if (response && typeof response === "object") {
+    const r = response as { data?: unknown; properties?: Property[] };
+    if (Array.isArray(r.data)) return r.data;
+    if (Array.isArray(r.properties)) return r.properties;
+  }
+  return [];
+}
+
 export default function OwnerPropertiesPage() {
   const [myProperties, setMyProperties] = useState<Property[]>([]);
   const [allProperties, setAllProperties] = useState<Property[]>([]);
@@ -34,28 +45,11 @@ export default function OwnerPropertiesPage() {
       try {
         // Get current user's properties
         const myPropsResponse = await propertiesApi.getByOwner(user.id);
-        // Handle different response formats
-        let myProps: Property[] = [];
-        if (Array.isArray(myPropsResponse.data)) {
-          myProps = myPropsResponse.data;
-        } else if (myPropsResponse.data?.properties) {
-          myProps = myPropsResponse.data.properties;
-        } else if (Array.isArray(myPropsResponse)) {
-          myProps = myPropsResponse;
-        }
-        setMyProperties(myProps);
+        setMyProperties(parsePropertyList(myPropsResponse));
 
-        // Get all properties (to see others)
-        const allPropsResponse = await propertiesApi.getAll();
-        // Handle different response formats
-        let allProps: Property[] = [];
-        if (Array.isArray(allPropsResponse.data)) {
-          allProps = allPropsResponse.data;
-        } else if (allPropsResponse.data?.properties) {
-          allProps = allPropsResponse.data.properties;
-        } else if (Array.isArray(allPropsResponse)) {
-          allProps = allPropsResponse;
-        }
+        // All properties (paginated search — photos included after backend fix)
+        const allPropsResponse = await propertiesApi.getAll({ limit: 500 });
+        const allProps = parsePropertyList(allPropsResponse).filter((p) => p.type !== "UNIT");
         setAllProperties(allProps);
       } catch (err: any) {
         console.error("Failed to load properties:", err);

@@ -10,6 +10,24 @@ const sanitize = (property: DbProperty): SafeProperty => {
   return property;
 };
 
+/** Load photo URLs for a property; for multi-unit parents, use first unit with photos. */
+const attachPhotos = async (property: DbProperty): Promise<SafeProperty> => {
+  let photos = (await photosService.getPhotosByProperty(property.id)).map((p) => p.url);
+
+  if (photos.length === 0 && property.hasUnits) {
+    const units = await propertiesRepo.getUnitsByPropertyId(property.id);
+    for (const unit of units) {
+      const unitPhotos = (await photosService.getPhotosByProperty(unit.id)).map((p) => p.url);
+      if (unitPhotos.length > 0) {
+        photos = unitPhotos;
+        break;
+      }
+    }
+  }
+
+  return { ...sanitize(property), photos };
+};
+
 export const createProperty = async (
   input: any
 ): Promise<SafeProperty> => {
@@ -36,74 +54,41 @@ export const createProperty = async (
 
 export const getPropertyById = async (id: string): Promise<SafeProperty | null> => {
   const prop = await propertiesRepo.getPropertyById(id);
-  const photos = (await photosService.getPhotosByProperty(id)).map(p => p.url);
-  if (prop) {
-    return { ...sanitize(prop), photos };
-  }
-  return prop ? sanitize(prop) : null;
+  if (!prop) return null;
+  return attachPhotos(prop);
 };
 
 export const listProperties = async (): Promise<SafeProperty[]> => {
   const props = await propertiesRepo.getAllProperties();
-  const propsWithPhotos = await Promise.all(
-    props.map(async (prop) => {
-      const photos = (await photosService.getPhotosByProperty(prop.id)).map(p => p.url);
-      return { ...sanitize(prop), photos };
-    })
-  );
-  return propsWithPhotos;
+  return Promise.all(props.map(attachPhotos));
 };
-
 
 //wont return units since they are not owned by the owner but by the property, and they are not of type UNIT, so we can filter them out in the repo layer itself
 export const getPropertiesByOwner = async (ownerId: string): Promise<SafeProperty[]> => {
   const props = await propertiesRepo.getPropertiesByOwnerId(ownerId);
-  const propsWithPhotos = await Promise.all(
-    props.map(async (prop) => {
-      const photos = (await photosService.getPhotosByProperty(prop.id)).map((p) => p.url);
-      return { ...sanitize(prop), photos };
-    })
-  );
-  return propsWithPhotos;
+  return Promise.all(props.map(attachPhotos));
 };
 
 
 //once u get the property id, u can get the units under that property, since they are owned by the property and they are of type UNIT, so we can filter them out in the repo layer itself
 export const getUnitsUnderProperty = async (propertyId: string): Promise<SafeProperty[]> => {
   const units = await propertiesRepo.getUnitsByPropertyId(propertyId);
-  const unitsWithPhotos = await Promise.all(
-    units.map(async (unit) => {
-      const photos = (await photosService.getPhotosByProperty(unit.id)).map(p => p.url);
-      return { ...sanitize(unit), photos };
-    })
-  );
-  return unitsWithPhotos;
+  return Promise.all(units.map(attachPhotos));
 };
 
 
 //get vacant units under a property, since they are owned by the property and they are of type UNIT, so we can filter them out in the repo layer itself, and then filter by status here
 export const getVacantUnitsUnderProperty = async (propertyId: string): Promise<SafeProperty[]> => {
   const units = await propertiesRepo.getUnitsByPropertyId(propertyId);
-  const unitsWithPhotos = await Promise.all(
-    units.filter((unit) => unit.status === "VACANT").map(async (unit) => {
-      const photos = (await photosService.getPhotosByProperty(unit.id)).map(p => p.url);
-      return { ...sanitize(unit), photos };
-    })
-  );
-  return unitsWithPhotos;
+  const vacant = units.filter((unit) => unit.status === "VACANT");
+  return Promise.all(vacant.map(attachPhotos));
 };
 
 //get vacant properties from the main page
 export const getVacantProperties = async (): Promise<SafeProperty[]> => {
   const props = await propertiesRepo.getAllProperties();
   const vacantProps = props.filter((prop) => prop.status === "VACANT" && prop.type !== "UNIT");
-  const propsWithPhotos = await Promise.all(
-    vacantProps.map(async (prop) => {
-      const photos = (await photosService.getPhotosByProperty(prop.id)).map(p => p.url);
-      return { ...sanitize(prop), photos };
-    })
-  );
-  return propsWithPhotos;
+  return Promise.all(vacantProps.map(attachPhotos));
 };
 
 
@@ -131,8 +116,10 @@ export const searchProperties = async (
     propertiesRepo.countProperties(where),
   ]);
 
+  const data = await Promise.all(items.map(attachPhotos));
+
   return {
-    data: items.map(sanitize),
+    data,
     total,
     page,
     totalPages: Math.ceil(total / limit) || 1,

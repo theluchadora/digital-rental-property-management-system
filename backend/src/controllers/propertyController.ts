@@ -55,6 +55,8 @@ export const listProperties = async (req: Request, res: Response) => {
     } = req.query as Record<string, string>;
 
     const where: any = {};
+    // Portfolio listing: top-level properties only (units listed under parents)
+    if (!type) where.type = { not: "UNIT" };
     if (city) where.city = { contains: city, mode: "insensitive" };
     if (type) where.type = type;
     if (status) where.status = status;

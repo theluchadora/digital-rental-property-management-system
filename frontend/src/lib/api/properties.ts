@@ -9,9 +9,17 @@ export const propertiesApi = {
     return response.data;
   },
 
-  // Get all properties
-  getAll: async (): Promise<ApiResponse<Property[]>> => {
-    const response = await apiClient.get("/properties");
+  // Get all properties (paginated API; pass a high limit for portfolio views)
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+    city?: string;
+    type?: string;
+    status?: string;
+  }): Promise<{ data: Property[]; total?: number; page?: number; totalPages?: number } | Property[]> => {
+    const response = await apiClient.get("/properties", {
+      params: { page: 1, limit: 500, ...params },
+    });
     return response.data;
   },
 
