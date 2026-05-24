@@ -30,6 +30,11 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { maintenanceApi } from "@/api/services";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 import type { MaintenanceRequest } from "@/api/types";
 
 export const Route = createFileRoute("/_admin/maintenance")({
@@ -38,7 +43,7 @@ export const Route = createFileRoute("/_admin/maintenance")({
 });
 
 function MaintenancePage() {
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["maintenance"],
     queryFn: maintenanceApi.list,
   });
@@ -98,7 +103,7 @@ function MaintenancePage() {
             </SelectContent>
           </Select>
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
         <Card className="overflow-hidden">
@@ -115,7 +120,11 @@ function MaintenancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((m) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={7} />}
+              {isError && !isLoading && <TableErrorRow colSpan={7} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">
                     {m.tenant.firstName} {m.tenant.lastName}
@@ -191,15 +200,8 @@ function MaintenancePage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No reports found
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={7} message="No maintenance requests found" />
               )}
             </TableBody>
           </Table>

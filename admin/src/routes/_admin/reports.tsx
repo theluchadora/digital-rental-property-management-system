@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/admin/PageHeader";
+import { ChartPanel, StatCard } from "@/components/admin/LoadingBlocks";
 import { reportsApi } from "@/api/services";
 import { TrendingUp, AlertCircle, Building2, FileText } from "lucide-react";
 
@@ -37,7 +38,7 @@ const PIE_COLORS = [
 ];
 
 function ReportsPage() {
-  const { data } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-reports"],
     queryFn: reportsApi.overview,
   });
@@ -45,26 +46,26 @@ function ReportsPage() {
   const kpis = [
     {
       label: "Revenue (MTD)",
-      value: data ? `${data.revenueThisMonth.toLocaleString()} ETB` : "—",
       icon: TrendingUp,
+      value: data ? `${data.revenueThisMonth.toLocaleString()} ETB` : undefined,
       hint: `${data?.paidInvoicesThisMonth ?? 0} paid invoices`,
     },
     {
       label: "Revenue (YTD)",
-      value: data ? `${data.revenueYtd.toLocaleString()} ETB` : "—",
       icon: TrendingUp,
+      value: data ? `${data.revenueYtd.toLocaleString()} ETB` : undefined,
       hint: "Year to date",
     },
     {
       label: "Outstanding",
-      value: data ? `${data.outstandingAmount.toLocaleString()} ETB` : "—",
       icon: AlertCircle,
+      value: data ? `${data.outstandingAmount.toLocaleString()} ETB` : undefined,
       hint: `${data?.outstandingCount ?? 0} unpaid/overdue`,
     },
     {
       label: "Top owner (YTD)",
-      value: data?.topOwnersByRevenue?.[0]?.name ?? "—",
       icon: Building2,
+      value: data?.topOwnersByRevenue?.[0]?.name,
       hint: data?.topOwnersByRevenue?.[0]
         ? `${data.topOwnersByRevenue[0].revenue.toLocaleString()} ETB`
         : "No paid invoices yet",
@@ -78,25 +79,23 @@ function ReportsPage() {
         description="Financial and operational insights across all owners and tenants."
       />
       <div className="space-y-6 p-6">
+        {isError && (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            Failed to load reports. Ensure the backend is running.
+          </p>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => (
-            <Card
+            <StatCard
               key={k.label}
-              className="border-border/60 bg-gradient-to-br from-card to-card/80 shadow-sm"
-            >
-              <CardContent className="flex items-start justify-between p-5">
-                <div>
-                  <p className="text-sm text-muted-foreground">{k.label}</p>
-                  <p className="mt-2 text-xl font-semibold tracking-tight">
-                    {k.value}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">{k.hint}</p>
-                </div>
-                <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
-                  <k.icon className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+              label={k.label}
+              icon={k.icon}
+              accent="from-card to-card/80"
+              isLoading={isLoading}
+              value={k.value}
+              hint={k.hint}
+            />
           ))}
         </div>
 
@@ -109,26 +108,33 @@ function ReportsPage() {
               </CardTitle>
               <CardDescription>Platform-wide billing</CardDescription>
             </CardHeader>
-            <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data?.invoicesByStatus ?? []}
-                    dataKey="count"
-                    nameKey="status"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={88}
-                    label={({ status, count }) => `${status}: ${count}`}
-                  >
-                    {(data?.invoicesByStatus ?? []).map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+            <CardContent>
+              <ChartPanel
+                isLoading={isLoading}
+                isError={isError}
+                variant="pie"
+                empty={!isLoading && (data?.invoicesByStatus?.length ?? 0) === 0}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data?.invoicesByStatus ?? []}
+                      dataKey="count"
+                      nameKey="status"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={88}
+                      label={({ status, count }) => `${status}: ${count}`}
+                    >
+                      {(data?.invoicesByStatus ?? []).map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartPanel>
             </CardContent>
           </Card>
 
@@ -137,20 +143,27 @@ function ReportsPage() {
               <CardTitle>Leases by status</CardTitle>
               <CardDescription>Active pipeline vs terminated</CardDescription>
             </CardHeader>
-            <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data?.leasesByStatus ?? []}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
-                  <XAxis dataKey="status" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar
-                    dataKey="count"
-                    fill="oklch(0.72 0.13 220)"
-                    radius={[6, 6, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <CardContent>
+              <ChartPanel
+                isLoading={isLoading}
+                isError={isError}
+                variant="bar"
+                empty={!isLoading && (data?.leasesByStatus?.length ?? 0) === 0}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data?.leasesByStatus ?? []}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
+                    <XAxis dataKey="status" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar
+                      dataKey="count"
+                      fill="oklch(0.72 0.13 220)"
+                      radius={[6, 6, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartPanel>
             </CardContent>
           </Card>
         </div>
@@ -160,26 +173,37 @@ function ReportsPage() {
             <CardTitle>Top owners by revenue (YTD)</CardTitle>
             <CardDescription>Based on paid invoices</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={data?.topOwnersByRevenue ?? []}
-                layout="vertical"
-                margin={{ left: 24 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" width={120} />
-                <Tooltip
-                  formatter={(v: number) => [`${v.toLocaleString()} ETB`, "Revenue"]}
-                />
-                <Bar
-                  dataKey="revenue"
-                  fill="hsl(212 60% 28%)"
-                  radius={[0, 6, 6, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent>
+            <ChartPanel
+              isLoading={isLoading}
+              isError={isError}
+              heightClass="h-80"
+              variant="horizontal-bar"
+              empty={!isLoading && (data?.topOwnersByRevenue?.length ?? 0) === 0}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={data?.topOwnersByRevenue ?? []}
+                  layout="vertical"
+                  margin={{ left: 24 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="name" width={120} />
+                  <Tooltip
+                    formatter={(v: number) => [
+                      `${v.toLocaleString()} ETB`,
+                      "Revenue",
+                    ]}
+                  />
+                  <Bar
+                    dataKey="revenue"
+                    fill="hsl(212 60% 28%)"
+                    radius={[0, 6, 6, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartPanel>
           </CardContent>
         </Card>
       </div>

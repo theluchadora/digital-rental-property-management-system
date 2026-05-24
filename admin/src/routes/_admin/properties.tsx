@@ -19,6 +19,11 @@ import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { propertiesApi } from "@/api/services";
 import { FloatingPropertyDetails } from "@/components/admin/FloatingPropertyDetails";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 import type { Property, PaginatedResponse } from "@/api/types";
 
 export const Route = createFileRoute("/_admin/properties")({
@@ -28,7 +33,7 @@ export const Route = createFileRoute("/_admin/properties")({
 
 function PropertiesPage() {
   const qc = useQueryClient();
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["properties"],
     queryFn: () => propertiesApi.list(),
   });
@@ -157,7 +162,7 @@ function PropertiesPage() {
             Export CSV
           </Button>
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
 
@@ -180,7 +185,11 @@ function PropertiesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((p) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={6} />}
+              {isError && !isLoading && <TableErrorRow colSpan={6} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((p) => (
                 <TableRow
                   key={p.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -215,15 +224,8 @@ function PropertiesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No properties found
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={6} message="No properties found" />
               )}
             </TableBody>
           </Table>

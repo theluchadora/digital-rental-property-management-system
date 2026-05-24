@@ -38,6 +38,12 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { statsApi } from "@/api/services";
 import { PageHeader } from "@/components/admin/PageHeader";
+import {
+  ActivityListSkeleton,
+  ChartPanel,
+  StatCard,
+} from "@/components/admin/LoadingBlocks";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_admin/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Estate Admin" }] }),
@@ -51,70 +57,70 @@ const COLORS = [
 ];
 
 function DashboardPage() {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, isError } = useQuery({
     queryKey: ["stats"],
     queryFn: statsApi.get,
   });
 
-  const cards = [
+  const statCards = [
     {
       label: "Total Users",
-      value: stats?.totalUsers,
       icon: Users,
-      hint: `${stats?.totalOwners ?? 0} owners · ${stats?.totalTenants ?? 0} tenants`,
       accent: "from-blue-500/10 to-transparent",
+      value: stats?.totalUsers,
+      hint: `${stats?.totalOwners ?? 0} owners · ${stats?.totalTenants ?? 0} tenants`,
     },
     {
       label: "Properties",
-      value: stats?.totalProperties,
       icon: Building2,
-      hint: "Root listings on platform",
       accent: "from-emerald-500/10 to-transparent",
+      value: stats?.totalProperties,
+      hint: "Root listings on platform",
     },
     {
       label: "Active Leases",
-      value: stats?.activeLeases,
       icon: FileText,
-      hint: `${stats?.totalLeases ?? 0} total leases`,
       accent: "from-violet-500/10 to-transparent",
+      value: stats?.activeLeases,
+      hint: `${stats?.totalLeases ?? 0} total leases`,
     },
     {
       label: "Revenue (paid)",
+      icon: Receipt,
+      accent: "from-amber-500/10 to-transparent",
       value:
         stats?.totalRevenue !== undefined
           ? `${stats.totalRevenue.toLocaleString()} ETB`
-          : "—",
-      icon: Receipt,
+          : undefined,
       hint: "All-time collected",
-      accent: "from-amber-500/10 to-transparent",
     },
     {
       label: "Pending Invoices",
-      value: stats?.pendingInvoices,
       icon: TrendingUp,
-      hint: "Unpaid · overdue · review",
       accent: "from-orange-500/10 to-transparent",
+      value: stats?.pendingInvoices,
+      hint: "Unpaid · overdue · review",
     },
     {
       label: "Open Maintenance",
-      value: stats?.openMaintenance,
       icon: Wrench,
-      hint: "OPEN + IN_PROGRESS",
       accent: "from-rose-500/10 to-transparent",
+      value: stats?.openMaintenance,
+      hint: "OPEN + IN_PROGRESS",
     },
     {
       label: "Open Incidents",
-      value: stats?.openIncidents,
       icon: ShieldAlert,
-      hint: "Needs admin review",
       accent: "from-red-500/10 to-transparent",
+      value: stats?.openIncidents,
+      hint: "Needs admin review",
     },
     {
       label: "Suspended Users",
-      value: stats?.suspendedUsers,
       icon: AlertTriangle,
-      hint: "Access restricted",
       accent: "from-slate-500/10 to-transparent",
+      value: stats?.suspendedUsers,
+      hint: "Access restricted",
     },
   ];
 
@@ -125,12 +131,23 @@ function DashboardPage() {
         description="Live platform health, revenue, and operational load."
       />
       <div className="space-y-6 p-6">
+        {isError && (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            Some dashboard data could not be loaded. Check that the backend is
+            running.
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-gradient-to-r from-primary/5 via-card to-secondary/5 px-4 py-3">
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <span className="font-medium">API</span>
             <span className="text-muted-foreground">
-              {stats?.systemHealth?.api ?? (isLoading ? "…" : "healthy")}
+              {isLoading ? (
+                <Skeleton className="inline-block h-4 w-16" />
+              ) : (
+                (stats?.systemHealth?.api ?? "healthy")
+              )}
             </span>
           </div>
           <div className="h-4 w-px bg-border" />
@@ -138,7 +155,11 @@ function DashboardPage() {
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <span className="font-medium">Database</span>
             <span className="text-muted-foreground">
-              {stats?.systemHealth?.database ?? (isLoading ? "…" : "healthy")}
+              {isLoading ? (
+                <Skeleton className="inline-block h-4 w-16" />
+              ) : (
+                (stats?.systemHealth?.database ?? "healthy")
+              )}
             </span>
           </div>
           <div className="ml-auto flex gap-2 text-sm">
@@ -158,28 +179,16 @@ function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {cards.map((c) => (
-            <Card
+          {statCards.map((c) => (
+            <StatCard
               key={c.label}
-              className={`overflow-hidden border-border/70 bg-gradient-to-br ${c.accent}`}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{c.label}</p>
-                    <p className="mt-2 text-2xl font-semibold tabular-nums">
-                      {c.value ?? "—"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {c.hint}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-2.5 text-primary">
-                    <c.icon className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              label={c.label}
+              icon={c.icon}
+              accent={c.accent}
+              isLoading={isLoading}
+              value={c.value}
+              hint={c.hint}
+            />
           ))}
         </div>
 
@@ -189,25 +198,32 @@ function DashboardPage() {
               <CardTitle>Monthly Revenue</CardTitle>
               <CardDescription>Paid invoices, last 6 months</CardDescription>
             </CardHeader>
-            <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats?.monthlyRevenue ?? []}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="oklch(0.9 0.01 250)"
-                  />
-                  <XAxis dataKey="month" stroke="oklch(0.5 0.02 250)" />
-                  <YAxis stroke="oklch(0.5 0.02 250)" />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="oklch(0.72 0.13 220)"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <CardContent>
+              <ChartPanel
+                isLoading={isLoading}
+                isError={isError}
+                variant="line"
+                empty={!isLoading && (stats?.monthlyRevenue?.length ?? 0) === 0}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={stats?.monthlyRevenue ?? []}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="oklch(0.9 0.01 250)"
+                    />
+                    <XAxis dataKey="month" stroke="oklch(0.5 0.02 250)" />
+                    <YAxis stroke="oklch(0.5 0.02 250)" />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="oklch(0.72 0.13 220)"
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartPanel>
             </CardContent>
           </Card>
 
@@ -219,26 +235,30 @@ function DashboardPage() {
               </CardTitle>
               <CardDescription>Latest signups, leases, tickets</CardDescription>
             </CardHeader>
-            <CardContent className="max-h-72 space-y-3 overflow-y-auto pr-1">
-              {(stats?.recentActivity ?? []).length === 0 ? (
+            <CardContent className="max-h-72 overflow-y-auto pr-1">
+              {isLoading ? (
+                <ActivityListSkeleton rows={5} />
+              ) : (stats?.recentActivity ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">No activity yet.</p>
               ) : (
-                stats?.recentActivity?.map((item) => (
-                  <div
-                    key={`${item.type}-${item.id}`}
-                    className="rounded-lg border bg-muted/30 px-3 py-2"
-                  >
-                    <p className="text-sm font-medium leading-snug">
-                      {item.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.subtitle} ·{" "}
-                      {formatDistanceToNow(new Date(item.at), {
-                        addSuffix: true,
-                      })}
-                    </p>
-                  </div>
-                ))
+                <div className="space-y-3">
+                  {stats?.recentActivity?.map((item) => (
+                    <div
+                      key={`${item.type}-${item.id}`}
+                      className="rounded-lg border bg-muted/30 px-3 py-2"
+                    >
+                      <p className="text-sm font-medium leading-snug">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.subtitle} ·{" "}
+                        {formatDistanceToNow(new Date(item.at), {
+                          addSuffix: true,
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -250,26 +270,33 @@ function DashboardPage() {
               <CardTitle>Users by Role</CardTitle>
               <CardDescription>Distribution</CardDescription>
             </CardHeader>
-            <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats?.usersByRole ?? []}
-                    dataKey="count"
-                    nameKey="role"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {(stats?.usersByRole ?? []).map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+            <CardContent>
+              <ChartPanel
+                isLoading={isLoading}
+                isError={isError}
+                variant="pie"
+                empty={!isLoading && (stats?.usersByRole?.length ?? 0) === 0}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={stats?.usersByRole ?? []}
+                      dataKey="count"
+                      nameKey="role"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label
+                    >
+                      {(stats?.usersByRole ?? []).map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartPanel>
             </CardContent>
           </Card>
 
@@ -278,23 +305,32 @@ function DashboardPage() {
               <CardTitle>Maintenance by Status</CardTitle>
               <CardDescription>Across all properties</CardDescription>
             </CardHeader>
-            <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats?.maintenanceByStatus ?? []}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="oklch(0.9 0.01 250)"
-                  />
-                  <XAxis dataKey="status" stroke="oklch(0.5 0.02 250)" />
-                  <YAxis stroke="oklch(0.5 0.02 250)" />
-                  <Tooltip />
-                  <Bar
-                    dataKey="count"
-                    fill="oklch(0.83 0.09 215)"
-                    radius={[6, 6, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <CardContent>
+              <ChartPanel
+                isLoading={isLoading}
+                isError={isError}
+                variant="bar"
+                empty={
+                  !isLoading && (stats?.maintenanceByStatus?.length ?? 0) === 0
+                }
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats?.maintenanceByStatus ?? []}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="oklch(0.9 0.01 250)"
+                    />
+                    <XAxis dataKey="status" stroke="oklch(0.5 0.02 250)" />
+                    <YAxis stroke="oklch(0.5 0.02 250)" />
+                    <Tooltip />
+                    <Bar
+                      dataKey="count"
+                      fill="oklch(0.83 0.09 215)"
+                      radius={[6, 6, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartPanel>
             </CardContent>
           </Card>
         </div>
@@ -306,7 +342,11 @@ function DashboardPage() {
               <div>
                 <p className="font-medium">Unread notifications</p>
                 <p className="text-sm text-muted-foreground">
-                  {stats?.unreadNotifications ?? 0} system-wide alerts
+                  {isLoading ? (
+                    <Skeleton className="h-4 w-44" />
+                  ) : (
+                    `${stats?.unreadNotifications ?? 0} system-wide alerts`
+                  )}
                 </p>
               </div>
             </div>

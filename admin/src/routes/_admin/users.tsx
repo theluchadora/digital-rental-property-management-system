@@ -62,6 +62,11 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { FloatingUserDetails } from "@/components/admin/FloatingUserDetails";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 import { usersApi } from "@/api/services";
 import { format } from "date-fns";
 import type { User } from "@/api/types";
@@ -408,26 +413,18 @@ function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                    Loading all users…
-                  </TableCell>
-                </TableRow>
-              )}
+              {isLoading && <TableSkeletonRows rows={8} columns={8} />}
               {isError && !isLoading && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-12 text-center text-destructive">
-                    Could not load users. Sign in as admin and ensure the API is running.
-                  </TableCell>
-                </TableRow>
+                <TableErrorRow
+                  colSpan={8}
+                  message="Could not load users. Sign in as admin and ensure the API is running."
+                />
               )}
               {!isLoading && !isError && filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                    No users match your filters.
-                  </TableCell>
-                </TableRow>
+                <TableEmptyRow
+                  colSpan={8}
+                  message="No users match your filters."
+                />
               )}
               {!isLoading &&
                 !isError &&

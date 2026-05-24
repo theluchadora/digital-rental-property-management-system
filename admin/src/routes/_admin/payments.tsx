@@ -22,6 +22,11 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { invoicesApi } from "@/api/services";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 
 export const Route = createFileRoute("/_admin/payments")({
   head: () => ({ meta: [{ title: "Payments — Estate Admin" }] }),
@@ -29,7 +34,7 @@ export const Route = createFileRoute("/_admin/payments")({
 });
 
 function PaymentsPage() {
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["invoices"],
     queryFn: invoicesApi.list,
   });
@@ -73,7 +78,7 @@ function PaymentsPage() {
             </SelectContent>
           </Select>
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
         <Card className="overflow-hidden">
@@ -89,7 +94,11 @@ function PaymentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((i) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={6} />}
+              {isError && !isLoading && <TableErrorRow colSpan={6} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">
                     {i.lease.tenant.firstName} {i.lease.tenant.lastName}
@@ -109,15 +118,8 @@ function PaymentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No payments found
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={6} message="No payments found" />
               )}
             </TableBody>
           </Table>

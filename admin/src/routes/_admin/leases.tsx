@@ -20,6 +20,11 @@ import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { leasesApi } from "@/api/services";
 import { FloatingLeaseDetails } from "@/components/admin/FloatingLeaseDetails";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 import type { Lease, PaginatedResponse } from "@/api/types";
 
 export const Route = createFileRoute("/_admin/leases")({
@@ -29,7 +34,7 @@ export const Route = createFileRoute("/_admin/leases")({
 
 function LeasesPage() {
   const qc = useQueryClient();
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["leases"],
     queryFn: () => leasesApi.list(),
   });
@@ -147,7 +152,7 @@ function LeasesPage() {
             Export CSV
           </Button>
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
 
@@ -171,7 +176,11 @@ function LeasesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((l) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={7} />}
+              {isError && !isLoading && <TableErrorRow colSpan={7} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((l) => (
                 <TableRow
                   key={l.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -209,15 +218,8 @@ function LeasesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No leases found
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={7} message="No leases found" />
               )}
             </TableBody>
           </Table>

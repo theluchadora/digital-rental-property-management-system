@@ -32,6 +32,11 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { incidentsApi } from "@/api/services";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 import type { IncidentReport, IncidentEvidence } from "@/api/types";
 
 export const Route = createFileRoute("/_admin/incidents")({
@@ -48,7 +53,7 @@ const urgencyOrder: Record<string, number> = {
 
 function IncidentsPage() {
   const queryClient = useQueryClient();
-  const { data = [] } = useQuery<IncidentReport[]>({
+  const { data = [], isLoading, isError } = useQuery<IncidentReport[]>({
     queryKey: ["admin", "incidents"],
     queryFn: () => incidentsApi.list(),
   });
@@ -168,7 +173,7 @@ function IncidentsPage() {
             </SelectContent>
           </Select>
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
 
@@ -186,7 +191,11 @@ function IncidentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((r) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={7} />}
+              {isError && !isLoading && <TableErrorRow colSpan={7} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((r) => (
                 <TableRow
                   key={r.id}
                   className={
@@ -239,15 +248,8 @@ function IncidentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No incident reports found
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={7} message="No incident reports found" />
               )}
             </TableBody>
           </Table>

@@ -8,6 +8,7 @@ import {
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { NotificationDropdown } from "@/components/admin/NotificationDropdown";
 import { useAuth } from "@/hooks/use-auth";
+import { PageLoading } from "@/components/admin/PageLoading";
 
 export const Route = createFileRoute("/_admin")({
   component: AdminLayout,
@@ -23,8 +24,10 @@ function AdminLayout() {
 
   if (loading || !isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading…
+      <div className="flex min-h-screen items-center justify-center p-8">
+        <PageLoading
+          label={loading ? "Checking session..." : "Redirecting to login..."}
+        />
       </div>
     );
   }

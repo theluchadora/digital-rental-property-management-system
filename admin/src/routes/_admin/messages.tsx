@@ -22,6 +22,11 @@ import {
 import { PageHeader } from "@/components/admin/PageHeader";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { messagesApi } from "@/api/services";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 import { Mail, MailOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_admin/messages")({
@@ -30,7 +35,7 @@ export const Route = createFileRoute("/_admin/messages")({
 });
 
 function MessagesPage() {
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["messages", "system"],
     queryFn: messagesApi.listSystem,
   });
@@ -63,7 +68,7 @@ function MessagesPage() {
             placeholder="Search by subject, content, sender or recipient…"
           />
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
         <Card className="overflow-hidden">
@@ -79,7 +84,11 @@ function MessagesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((m) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={6} />}
+              {isError && !isLoading && <TableErrorRow colSpan={6} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell>
                     {m.readAt ? (
@@ -128,15 +137,8 @@ function MessagesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No messages found
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={6} message="No messages found" />
               )}
             </TableBody>
           </Table>

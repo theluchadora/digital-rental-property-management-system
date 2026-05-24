@@ -22,6 +22,11 @@ import { PageHeader } from "@/components/admin/PageHeader";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { notificationsApi } from "@/api/services";
+import {
+  TableEmptyRow,
+  TableErrorRow,
+  TableSkeletonRows,
+} from "@/components/admin/LoadingBlocks";
 
 export const Route = createFileRoute("/_admin/notifications")({
   head: () => ({ meta: [{ title: "Notifications — Estate Admin" }] }),
@@ -29,7 +34,7 @@ export const Route = createFileRoute("/_admin/notifications")({
 });
 
 function NotificationsPage() {
-  const { data = [] } = useQuery({
+  const { data = [], isLoading, isError } = useQuery({
     queryKey: ["notifications", "system"],
     queryFn: notificationsApi.listSystem,
   });
@@ -75,7 +80,7 @@ function NotificationsPage() {
             </SelectContent>
           </Select>
           <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} results
+            {isLoading ? "Loading…" : `${filtered.length} results`}
           </span>
         </div>
         <Card className="overflow-hidden">
@@ -90,7 +95,11 @@ function NotificationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((n) => (
+              {isLoading && <TableSkeletonRows rows={8} columns={5} />}
+              {isError && !isLoading && <TableErrorRow colSpan={5} />}
+              {!isLoading &&
+                !isError &&
+                filtered.map((n) => (
                 <TableRow key={n.id}>
                   <TableCell className="font-medium">
                     {n.user ? `${n.user.firstName} ${n.user.lastName}` : "—"}
@@ -117,15 +126,8 @@ function NotificationsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No notifications
-                  </TableCell>
-                </TableRow>
+              {!isLoading && !isError && filtered.length === 0 && (
+                <TableEmptyRow colSpan={5} message="No notifications" />
               )}
             </TableBody>
           </Table>
