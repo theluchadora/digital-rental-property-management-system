@@ -52,7 +52,7 @@ export default function TenantDashboard() {
     if (!readAnnouncementIds.includes(a.id)) {
       const updated = [...readAnnouncementIds, a.id];
       setReadAnnouncementIds(updated);
-      markAnnouncementAsRead(a.id);
+      markAnnouncementAsRead(a.id, queryClient);
       announcementsApi.markNotificationsRead({ title: a.title }).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });

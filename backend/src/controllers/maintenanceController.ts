@@ -1,6 +1,11 @@
+import path from "path";
 import { Request, Response } from "express";
 import { z } from "zod";
 import * as maintenanceService from "../services/maintenanceService";
+import {
+  saveMaintenanceEvidenceBase64,
+  uploadsRoot,
+} from "../utils/localUploads";
 
 const createSchema = z.object({
   unitId: z.string(),
@@ -14,10 +19,18 @@ const statusSchema = z.object({
   note: z.string().optional(),
 });
 
-const evidenceSchema = z.object({
+const evidenceUrlSchema = z.object({
   fileUrl: z.string().url(),
   fileName: z.string().optional(),
 });
+
+const evidenceBase64Schema = z.object({
+  fileBase64: z.string().min(1),
+  fileName: z.string().min(1),
+  mimeType: z.string().optional(),
+});
+
+const evidenceSchema = z.union([evidenceUrlSchema, evidenceBase64Schema]);
 
 export const getLeasableProperties = async (
   req: Request & { user?: { id: string } },
@@ -111,10 +124,29 @@ export const uploadEvidence = async (req: Request & { user?: { id: string } }, r
     }
 
     const body = evidenceSchema.parse(req.body);
+    const maintenanceId = req.params.id as string;
+
+    let fileUrl: string;
+    let fileName: string | undefined;
+
+    if ("fileBase64" in body) {
+      const saved = saveMaintenanceEvidenceBase64(
+        maintenanceId,
+        body.fileBase64,
+        body.fileName,
+        body.mimeType
+      );
+      fileUrl = saved.fileUrl;
+      fileName = saved.fileName;
+    } else {
+      fileUrl = body.fileUrl;
+      fileName = body.fileName;
+    }
+
     const evidence = await maintenanceService.addEvidence({
-      maintenanceId: req.params.id as string,
-      fileUrl: body.fileUrl,
-      fileName: body.fileName,
+      maintenanceId,
+      fileUrl,
+      fileName,
       uploadedBy: req.user.id,
     });
     res.status(201).json({ evidence });
@@ -128,6 +160,14 @@ export const downloadEvidence = async (req: Request, res: Response) => {
   try {
     const evidence = await maintenanceService.getEvidenceById(req.params.id as string);
     if (!evidence) return res.status(404).json({ error: "Evidence not found" });
+
+    const localPrefix = "/api/v1/uploads/";
+    if (evidence.fileUrl.startsWith(localPrefix)) {
+      const relative = evidence.fileUrl.slice(localPrefix.length);
+      const filePath = path.join(uploadsRoot, relative);
+      return res.sendFile(path.resolve(filePath));
+    }
+
     res.redirect(evidence.fileUrl);
   } catch (err: any) {
     console.error("Error caught in maintenanceController.ts:", err);

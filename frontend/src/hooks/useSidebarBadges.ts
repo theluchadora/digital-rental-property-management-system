@@ -7,6 +7,8 @@ import { announcementsApi } from "@/lib/api/announcements";
 import { leasesApi } from "@/lib/api/leases";
 import { subscribeToEvent } from "@/lib/websocket";
 import { getReadAnnouncementIds } from "@/lib/announcement-read";
+import { prependUnreadNotification } from "@/lib/sidebar-badges-cache";
+import type { Notification } from "@/types/api";
 
 export function useSidebarBadges() {
   const { user } = useAuth();
@@ -15,14 +17,28 @@ export function useSidebarBadges() {
 
   useEffect(() => {
     if (!enabled) return;
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+
+    const onNewNotification = (data: unknown) => {
+      const raw = data as Notification & { content?: string };
+      if (raw?.id) {
+        prependUnreadNotification(queryClient, {
+          ...raw,
+          message: raw.message ?? raw.content ?? "",
+          isRead: false,
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      }
     };
-    const unsubNotif = subscribeToEvent("NEW_NOTIFICATION", invalidate);
-    const unsubMsg = subscribeToEvent("NEW_MESSAGE", invalidate);
+
+    const onNewMessage = () => {
+      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    };
+
+    const unsubNotif = subscribeToEvent("NEW_NOTIFICATION", onNewNotification);
+    const unsubMsg = subscribeToEvent("NEW_MESSAGE", onNewMessage);
     return () => {
       unsubNotif();
       unsubMsg();

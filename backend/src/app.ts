@@ -1,7 +1,9 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
 import { Router } from "express";
+import { uploadsRoot } from "./utils/localUploads";
 import { authenticateToken } from "./auth/authMiddleware";
 import {
   initializePayment,
@@ -50,9 +52,11 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "12mb" }));
+app.use(express.urlencoded({ extended: true, limit: "12mb" }));
 app.use(cookieParser());
+app.use("/api/v1/uploads", express.static(uploadsRoot));
+app.use("/api/uploads", express.static(uploadsRoot));
 
 // Swagger UI (served at /api/docs) -- configure to include credentials so cookies are sent
 app.use(

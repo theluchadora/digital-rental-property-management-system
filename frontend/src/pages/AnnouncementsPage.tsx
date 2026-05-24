@@ -39,6 +39,7 @@ import {
   markAnnouncementsAsRead,
   isAnnouncementRead,
 } from "@/lib/announcement-read";
+import { clearAnnouncementBadge } from "@/lib/sidebar-badges-cache";
 
 function AnnouncementLeaseActions({ leaseId }: { leaseId: string }) {
   const queryClient = useQueryClient();
@@ -116,16 +117,18 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     if (announcements.length === 0) return;
-    markAnnouncementsAsRead(announcements.map((a) => a.id));
+    markAnnouncementsAsRead(
+      announcements.map((a) => a.id),
+      queryClient
+    );
+    clearAnnouncementBadge(queryClient);
     announcementsApi.markNotificationsRead().catch(() => {});
-    queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
     queryClient.invalidateQueries({ queryKey: ["notifications"] });
   }, [announcements, queryClient]);
 
   const handleViewAnnouncement = (announcement: Announcement) => {
-    markAnnouncementAsRead(announcement.id);
+    markAnnouncementAsRead(announcement.id, queryClient);
     announcementsApi.markNotificationsRead({ title: announcement.title }).catch(() => {});
-    queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
     queryClient.invalidateQueries({ queryKey: ["notifications"] });
   };
 

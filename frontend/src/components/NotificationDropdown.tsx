@@ -9,6 +9,11 @@ import { messagesApi } from "@/lib/api/messages";
 import { subscribeToEvent } from "@/lib/websocket";
 import { useToast } from "@/hooks/use-toast";
 import type { Notification } from "@/types/api";
+import {
+  applyNotificationRead,
+  patchSidebarBadges,
+  prependUnreadNotification,
+} from "@/lib/sidebar-badges-cache";
 
 const iconMap: Record<string, typeof Info> = {
   INVOICE: CreditCard,
@@ -50,19 +55,15 @@ function getNotificationRoute(n: Notification): string {
   }
 }
 
-function decrementSidebarNotificationCount(
-  queryClient: ReturnType<typeof useQueryClient>
-) {
-  queryClient.setQueriesData<{ notifications?: number }>(
-    { queryKey: ["sidebar-badges"] },
-    (old) => {
-      if (!old) return old;
-      return {
-        ...old,
-        notifications: Math.max(0, (old.notifications ?? 0) - 1),
-      };
-    }
-  );
+function normalizeNotification(data: unknown): Notification | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as Notification & { content?: string };
+  if (!raw.id) return null;
+  return {
+    ...raw,
+    message: raw.message ?? raw.content ?? "",
+    isRead: raw.isRead ?? false,
+  };
 }
 
 export default function NotificationDropdown() {
@@ -73,9 +74,15 @@ export default function NotificationDropdown() {
 
   useEffect(() => {
     const unsubscribe = subscribeToEvent("NEW_NOTIFICATION", (data: unknown) => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
-      const n = data as { title?: string; message?: string; content?: string; type?: string };
+      const notification = normalizeNotification(data);
+      if (notification) {
+        prependUnreadNotification(queryClient, notification);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      }
+
+      const n = data as { title?: string; message?: string; content?: string };
       const title = n?.title || "New notification";
       const body = n?.message || n?.content || "";
       toast({
@@ -99,10 +106,16 @@ export default function NotificationDropdown() {
     onMutate: async (notificationId: string) => {
       await queryClient.cancelQueries({ queryKey: ["notifications"] });
       const previous = queryClient.getQueryData<Notification[]>(["notifications"]);
+      const removed = (previous ?? []).find((n) => n.id === notificationId);
       queryClient.setQueryData<Notification[]>(["notifications"], (old = []) =>
         old.filter((n) => n.id !== notificationId)
       );
-      decrementSidebarNotificationCount(queryClient);
+      applyNotificationRead(queryClient, 1);
+      if (removed?.type === "ANNOUNCEMENT") {
+        patchSidebarBadges(queryClient, (old) => ({
+          announcements: Math.max(0, old.announcements - 1),
+        }));
+      }
       return { previous };
     },
     onError: (_err, _id, context) => {
@@ -110,6 +123,7 @@ export default function NotificationDropdown() {
         queryClient.setQueryData(["notifications"], context.previous);
       }
       queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
@@ -120,16 +134,14 @@ export default function NotificationDropdown() {
     await queryClient.cancelQueries({ queryKey: ["notifications"] });
     const previous = queryClient.getQueryData<Notification[]>(["notifications"]);
     queryClient.setQueryData<Notification[]>(["notifications"], []);
-    queryClient.setQueriesData<{ notifications?: number }>(
-      { queryKey: ["sidebar-badges"] },
-      (old) => (old ? { ...old, notifications: 0 } : old)
-    );
+    patchSidebarBadges(queryClient, { notifications: 0 });
 
     try {
       await Promise.all(unread.map((n) => notificationsApi.markRead(n.id)));
     } catch (e) {
       if (previous) queryClient.setQueryData(["notifications"], previous);
       queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       console.error("Failed to mark all notifications read:", e);
     }
   };

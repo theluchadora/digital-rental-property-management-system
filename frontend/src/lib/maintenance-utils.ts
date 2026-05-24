@@ -10,10 +10,19 @@ export function formatMaintenancePropertyLabel(req: MaintenanceRequest): string 
   return parts.join(" · ");
 }
 
+function resolveEvidenceUrl(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/")) return url;
+  return `${apiClient.defaults.baseURL?.replace(/\/api\/v1$/, "") || ""}${url}`;
+}
+
 export function getMaintenanceEvidenceUrls(evidence?: MaintenanceEvidence[]): string[] {
   if (!evidence?.length) return [];
   return evidence
-    .map((ev) => ev.fileUrl || `${apiClient.defaults.baseURL}/maintenance-requests/evidence/${ev.id}/download`)
+    .map((ev) => {
+      if (ev.fileUrl) return resolveEvidenceUrl(ev.fileUrl);
+      return `${apiClient.defaults.baseURL}/maintenance-requests/evidence/${ev.id}/download`;
+    })
     .filter(Boolean);
 }
 

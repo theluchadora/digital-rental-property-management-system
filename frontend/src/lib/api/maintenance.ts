@@ -14,6 +14,29 @@ export interface CreateMaintenancePayload {
   description: string;
 }
 
+function hasCloudinaryConfig(): boolean {
+  return Boolean(
+    import.meta.env.VITE_CLOUDINARY_CLOUD_NAME &&
+      import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
+  );
+}
+
+async function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(",");
+      resolve({
+        base64: comma >= 0 ? result.slice(comma + 1) : result,
+        mimeType: file.type || "image/jpeg",
+      });
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export const maintenanceApi = {
   getLeasableProperties: () =>
     apiClient
@@ -29,16 +52,31 @@ export const maintenanceApi = {
   create: (data: CreateMaintenancePayload) =>
     apiClient.post<{ request: MaintenanceRequest }>("/maintenance-requests", data),
 
-  /** Owner/Admin updates maintenance status */
   updateStatus: (requestId: string, data: { status: string; note?: string }) =>
     apiClient.put<{ request: MaintenanceRequest }>(`/maintenance-requests/${requestId}/status`, data),
 
-  /** Upload to Cloudinary, then register evidence on the request */
+  /** Cloudinary when configured; otherwise server base64 upload */
   uploadEvidence: async (requestId: string, file: File) => {
-    const fileUrl = await uploadMaintenanceImage(file, requestId);
+    if (hasCloudinaryConfig()) {
+      try {
+        const fileUrl = await uploadMaintenanceImage(file, requestId);
+        return apiClient.post<{ evidence: MaintenanceEvidence }>(
+          `/maintenance-requests/${requestId}/evidence`,
+          { fileUrl, fileName: file.name }
+        );
+      } catch (err) {
+        console.warn("Cloudinary upload failed, using server upload:", err);
+      }
+    }
+
+    const { base64, mimeType } = await fileToBase64(file);
     return apiClient.post<{ evidence: MaintenanceEvidence }>(
       `/maintenance-requests/${requestId}/evidence`,
-      { fileUrl, fileName: file.name }
+      {
+        fileBase64: base64,
+        fileName: file.name,
+        mimeType,
+      }
     );
   },
 
