@@ -10,7 +10,31 @@ export const createMaintenance = async (
 export const getMaintenanceById = async (
   id: string
 ): Promise<Maintenance | null> => {
-  return prisma.maintenance.findUnique({ where: { id } });
+  return prisma.maintenance.findUnique({
+    where: { id },
+    include: {
+      property: {
+        select: {
+          id: true,
+          title: true,
+          unitNumber: true,
+          type: true,
+          city: true,
+          address: true,
+          parent: { select: { title: true } },
+        },
+      },
+      createdByUser: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      evidence: true,
+    },
+  });
 };
 
 export const listMaintenance = async (
@@ -23,6 +47,28 @@ export const listMaintenance = async (
     orderBy: { createdAt: "desc" },
     skip,
     take,
+    include: {
+      property: {
+        select: {
+          id: true,
+          title: true,
+          unitNumber: true,
+          type: true,
+          city: true,
+          address: true,
+          parent: { select: { title: true } },
+        },
+      },
+      createdByUser: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+      evidence: true,
+    },
   });
 };
 

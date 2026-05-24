@@ -50,6 +50,21 @@ function getNotificationRoute(n: Notification): string {
   }
 }
 
+function decrementSidebarNotificationCount(
+  queryClient: ReturnType<typeof useQueryClient>
+) {
+  queryClient.setQueriesData<{ notifications?: number }>(
+    { queryKey: ["sidebar-badges"] },
+    (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        notifications: Math.max(0, (old.notifications ?? 0) - 1),
+      };
+    }
+  );
+}
+
 export default function NotificationDropdown() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -77,20 +92,46 @@ export default function NotificationDropdown() {
     refetchInterval: false,
   });
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.length;
 
   const markReadMutation = useMutation({
     mutationFn: notificationsApi.markRead,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    onMutate: async (notificationId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previous = queryClient.getQueryData<Notification[]>(["notifications"]);
+      queryClient.setQueryData<Notification[]>(["notifications"], (old = []) =>
+        old.filter((n) => n.id !== notificationId)
+      );
+      decrementSidebarNotificationCount(queryClient);
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["notifications"], context.previous);
+      }
       queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
     },
   });
 
-  const markAllRead = () => {
-    notifications.forEach((n) => {
-      if (!n.isRead) markReadMutation.mutate(n.id);
-    });
+  const markAllRead = async () => {
+    const unread = [...notifications];
+    if (unread.length === 0) return;
+
+    await queryClient.cancelQueries({ queryKey: ["notifications"] });
+    const previous = queryClient.getQueryData<Notification[]>(["notifications"]);
+    queryClient.setQueryData<Notification[]>(["notifications"], []);
+    queryClient.setQueriesData<{ notifications?: number }>(
+      { queryKey: ["sidebar-badges"] },
+      (old) => (old ? { ...old, notifications: 0 } : old)
+    );
+
+    try {
+      await Promise.all(unread.map((n) => notificationsApi.markRead(n.id)));
+    } catch (e) {
+      if (previous) queryClient.setQueryData(["notifications"], previous);
+      queryClient.invalidateQueries({ queryKey: ["sidebar-badges"] });
+      console.error("Failed to mark all notifications read:", e);
+    }
   };
 
   const handleClick = async (n: Notification) => {

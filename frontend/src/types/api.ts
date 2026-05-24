@@ -204,34 +204,46 @@ export interface RefreshTokenResponse {
 //   reviewer?: User;
 // }
 
-// // ===== Maintenance =====
-// export interface MaintenanceEvidence {
-//   id: string;
-//   requestId: string;
-//   filePath: string;
-//   uploadedBy: string;
-//   createdAt: string;
-//   updatedAt: string;
-// }
+// ===== Maintenance =====
+export interface MaintenanceEvidence {
+  id: string;
+  maintenanceId?: string;
+  fileUrl: string;
+  fileName?: string | null;
+  uploadedBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-// export interface MaintenanceRequest {
-//   id: string;
-//   unitId: string;
-//   tenantId: string;
-//   category: string;
-//   priority: MaintenancePriority;
-//   description: string;
-//   status: MaintenanceStatus;
-//   note?: string | null;
-//   resolvedAt?: string | null;
-//   resolvedBy?: string | null;
-//   createdAt: string;
-//   updatedAt: string;
-//   unit?: RentalUnit;
-//   tenant?: User;
-//   resolver?: User;
-//   evidence?: MaintenanceEvidence[];
-// }
+export interface LeasablePropertyOption {
+  leaseId: string;
+  propertyId: string;
+  label: string;
+  leaseStatus: string;
+  property?: Property;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  propertyId?: string;
+  createdBy?: string;
+  title?: string;
+  category?: string;
+  priority: MaintenancePriority;
+  description?: string | null;
+  status: MaintenanceStatus;
+  notes?: string | null;
+  note?: string | null;
+  completedDate?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  property?: Property & { parent?: { title?: string } | null };
+  tenant?: User;
+  createdByUser?: User;
+  evidence?: MaintenanceEvidence[];
+  unit?: { unitIdentifier?: string; property?: Property };
+}
 
 // ===== Messaging =====
 export interface Message {

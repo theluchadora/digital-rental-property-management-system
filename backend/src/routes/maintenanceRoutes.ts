@@ -5,6 +5,12 @@ import { authenticateToken, authorizeRoles } from "../auth/authMiddleware";
 const router = Router();
 
 router.get("/", authenticateToken, maintenanceController.list);
+router.get(
+  "/leasable-properties",
+  authenticateToken,
+  authorizeRoles("TENANT"),
+  maintenanceController.getLeasableProperties
+);
 router.get("/:id", authenticateToken, maintenanceController.getById);
 router.post("/", authenticateToken, authorizeRoles("TENANT"), maintenanceController.create);
 router.put("/:id/status", authenticateToken, authorizeRoles("OWNER"), maintenanceController.updateStatus);

@@ -19,6 +19,20 @@ const evidenceSchema = z.object({
   fileName: z.string().optional(),
 });
 
+export const getLeasableProperties = async (
+  req: Request & { user?: { id: string } },
+  res: Response
+) => {
+  try {
+    if (!req.user?.id) return res.status(401).json({ error: "Unauthorized" });
+    const properties = await maintenanceService.getLeasablePropertiesForTenant(req.user.id);
+    res.json({ properties });
+  } catch (err: any) {
+    console.error("Error caught in maintenanceController.ts (getLeasableProperties):", err);
+    res.status(500).json({ error: err.message || "Failed to load leased properties" });
+  }
+};
+
 export const list = async (req: Request & { user?: { id: string; role: string } }, res: Response) => {
   try {
     const { status, unitId, page = "1", limit = "20" } = req.query as Record<string, string>;
@@ -88,12 +102,20 @@ export const updateStatus = async (req: Request, res: Response) => {
 
 export const uploadEvidence = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
+    if (!req.user?.id) return res.status(401).json({ error: "Unauthorized" });
+
+    const maintenance = await maintenanceService.getMaintenanceById(req.params.id as string);
+    if (!maintenance) return res.status(404).json({ error: "Request not found" });
+    if (maintenance.createdBy !== req.user.id) {
+      return res.status(403).json({ error: "Only the request creator can upload evidence" });
+    }
+
     const body = evidenceSchema.parse(req.body);
     const evidence = await maintenanceService.addEvidence({
       maintenanceId: req.params.id as string,
       fileUrl: body.fileUrl,
       fileName: body.fileName,
-      uploadedBy: req.user?.id,
+      uploadedBy: req.user.id,
     });
     res.status(201).json({ evidence });
   } catch (err: any) {

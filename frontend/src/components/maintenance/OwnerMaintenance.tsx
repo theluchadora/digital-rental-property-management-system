@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { propertyImages } from "@/data/mockData";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, CheckCircle, XCircle, Upload, Eye, Filter, Download, FileText, Image as ImageIcon, ChevronLeft, ChevronRight, X, AlertCircle } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Upload, Filter, FileText, Image as ImageIcon, AlertCircle } from "lucide-react";
 import FileUploadArea from "@/components/FileUploadArea";
 import { maintenanceApi } from "@/lib/api/maintenance";
 import { PageLoader, StatsGridSkeleton } from "@/components/ui/loading-state";
-import type { MaintenanceRequest, MaintenanceEvidence } from "@/types/api";
+import type { MaintenanceRequest } from "@/types/api";
+import { formatMaintenancePropertyLabel, mapMaintenanceRequest, type MappedMaintenanceRequest } from "@/lib/maintenance-utils";
+import MaintenanceEvidenceSection, { MaintenanceEvidenceThumbnail } from "@/components/maintenance/MaintenanceEvidenceSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const priorityColors: Record<string, string> = {
@@ -31,12 +32,9 @@ const statusColors: Record<string, string> = {
   CANCELLED: "bg-muted text-muted-foreground",
 };
 
-interface ExtendedMaintenanceRequest extends MaintenanceRequest {
-  title?: string;
-  detailedDescription?: string;
-  evidenceUrls?: string[];
+type ExtendedMaintenanceRequest = MappedMaintenanceRequest & {
   rejectionReason?: string;
-}
+};
 
 export default function OwnerMaintenance() {
   const { toast } = useToast();
@@ -49,12 +47,9 @@ export default function OwnerMaintenance() {
     try {
       setIsLoading(true);
       const res = await maintenanceApi.list();
-      const mapped: ExtendedMaintenanceRequest[] = (res.data.data || []).map((req: MaintenanceRequest) => ({
-        ...req,
-        title: (req as unknown as Record<string, unknown>).title as string || req.description?.split(".")[0] || "Maintenance Issue",
-        detailedDescription: req.description,
-        evidenceUrls: (req.evidence || []).map((ev: MaintenanceEvidence) => maintenanceApi.getEvidenceDownloadUrl(ev.id)),
-      }));
+      const mapped: ExtendedMaintenanceRequest[] = (res.data.data || []).map((req: MaintenanceRequest) =>
+        mapMaintenanceRequest(req)
+      );
       setRequests(mapped);
     } catch (err) {
       console.error(err);
@@ -76,8 +71,7 @@ export default function OwnerMaintenance() {
   const [resolveFiles, setResolveFiles] = useState<File[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [filterPriority, setFilterPriority] = useState<string>("ALL");
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [fullscreenImageOpen, setFullscreenImageOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const getTitle = (desc: string) => {
     const dotIdx = desc.indexOf(".");
@@ -172,26 +166,19 @@ export default function OwnerMaintenance() {
     }
   };
 
-  const openDetail = (req: ExtendedMaintenanceRequest) => {
+  const openDetail = async (req: ExtendedMaintenanceRequest) => {
     setSelectedRequest(req);
-    setCurrentImageIndex(0);
     setDetailOpen(true);
-  };
-
-  const openFullscreenImage = (index: number) => {
-    setCurrentImageIndex(index);
-    setFullscreenImageOpen(true);
-  };
-
-  const nextImage = () => {
-    if (selectedRequest?.evidenceUrls && selectedRequest.evidenceUrls.length > 0) {
-      setCurrentImageIndex((prev) => (prev + 1) % selectedRequest.evidenceUrls!.length);
-    }
-  };
-
-  const prevImage = () => {
-    if (selectedRequest?.evidenceUrls && selectedRequest.evidenceUrls.length > 0) {
-      setCurrentImageIndex((prev) => (prev - 1 + selectedRequest.evidenceUrls!.length) % selectedRequest.evidenceUrls!.length);
+    setDetailLoading(true);
+    try {
+      const { data } = await maintenanceApi.getById(req.id);
+      if (data.request) {
+        setSelectedRequest(mapMaintenanceRequest(data.request));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -307,12 +294,7 @@ export default function OwnerMaintenance() {
                 </CardContent>
               </Card>
             ) : (
-              filteredRequests.map((req, idx) => {
-                const firstImage = req.evidenceUrls && req.evidenceUrls.length > 0 
-                  ? req.evidenceUrls[0] 
-                  : propertyImages[idx % propertyImages.length];
-                
-                return (
+              filteredRequests.map((req) => (
                   <Card 
                     key={req.id} 
                     className="hover:shadow-md transition-shadow cursor-pointer" 
@@ -320,22 +302,7 @@ export default function OwnerMaintenance() {
                   >
                     <CardContent className="p-4">
                       <div className="flex gap-4">
-                        {/* Image - fixed size */}
-                        <div className="flex-shrink-0">
-                          <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted">
-                            <img 
-                              src={firstImage} 
-                              alt={req.title || req.category} 
-                              loading="lazy" 
-                              className="w-full h-full object-cover" 
-                            />
-                            {req.evidenceUrls && req.evidenceUrls.length > 1 && (
-                              <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1 rounded">
-                                +{req.evidenceUrls.length}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <MaintenanceEvidenceThumbnail evidenceUrls={req.evidenceUrls} />
                         
                         {/* Content - takes full remaining width */}
                         <div className="flex-1">
@@ -368,7 +335,7 @@ export default function OwnerMaintenance() {
                           </p>
                           
                           <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 flex-wrap">
-                            <span>📍 {req.unit?.unitIdentifier}</span>
+                            <span>📍 {formatMaintenancePropertyLabel(req)}</span>
                             <span>👤 {req.tenant?.firstName} {req.tenant?.lastName}</span>
                             <span className="uppercase text-[10px]">Category: {req.category}</span>
                             <span>📅 {new Date(req.createdAt).toLocaleDateString()}</span>
@@ -382,8 +349,7 @@ export default function OwnerMaintenance() {
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })
+              ))
             )}
           </div>
         </div>
@@ -426,66 +392,18 @@ export default function OwnerMaintenance() {
           </DialogHeader>
           {selectedRequest && (
             <div className="space-y-4 mt-2">
+              {detailLoading ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">Loading request details...</div>
+              ) : (
+              <>
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge className={priorityColors[selectedRequest.priority]}>{selectedRequest.priority}</Badge>
                 <Badge className={statusColors[selectedRequest.status]}>
                   {selectedRequest.status.replace("_", " ")}
                 </Badge>
               </div>
-              
-              {/* Image Gallery */}
-              {selectedRequest.evidenceUrls && selectedRequest.evidenceUrls.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs uppercase font-semibold text-muted-foreground">Attached Images</p>
-                    <p className="text-xs text-muted-foreground">{selectedRequest.evidenceUrls.length} image(s)</p>
-                  </div>
-                  <div className="relative">
-                    <div className="relative h-64 md:h-96 rounded-lg overflow-hidden bg-muted">
-                      <img 
-                        src={selectedRequest.evidenceUrls[currentImageIndex]} 
-                        alt={`Evidence ${currentImageIndex + 1}`}
-                        className="h-full w-full object-contain cursor-pointer"
-                        onClick={() => openFullscreenImage(currentImageIndex)}
-                      />
-                      {selectedRequest.evidenceUrls.length > 1 && (
-                        <>
-                          <button
-                            onClick={prevImage}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
-                          >
-                            <ChevronLeft className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={nextImage}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
-                          >
-                            <ChevronRight className="h-5 w-5" />
-                          </button>
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                            {currentImageIndex + 1} / {selectedRequest.evidenceUrls.length}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {selectedRequest.evidenceUrls.length > 1 && (
-                    <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                      {selectedRequest.evidenceUrls.map((url, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setCurrentImageIndex(idx)}
-                          className={`relative flex-shrink-0 h-16 w-16 rounded-md overflow-hidden border-2 transition-all ${
-                            idx === currentImageIndex ? 'border-secondary' : 'border-transparent'
-                          }`}
-                        >
-                          <img src={url} alt={`Thumbnail ${idx + 1}`} className="h-full w-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+
+              <MaintenanceEvidenceSection evidenceUrls={selectedRequest.evidenceUrls} />
               
               {/* Description */}
               <div>
@@ -500,8 +418,8 @@ export default function OwnerMaintenance() {
               
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-[10px] uppercase text-muted-foreground">Unit</p>
-                  <p className="font-medium">{selectedRequest.unit?.unitIdentifier}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Property</p>
+                  <p className="font-medium">{formatMaintenancePropertyLabel(selectedRequest)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase text-muted-foreground">Tenant</p>
@@ -623,6 +541,8 @@ export default function OwnerMaintenance() {
                   </div>
                 )}
               </div>
+              </>
+              )}
             </div>
           )}
         </DialogContent>
@@ -670,32 +590,6 @@ export default function OwnerMaintenance() {
         </DialogContent>
       </Dialog>
 
-      {/* Fullscreen Image Dialog */}
-      <Dialog open={fullscreenImageOpen} onOpenChange={setFullscreenImageOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95">
-          <button onClick={() => setFullscreenImageOpen(false)} className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors z-10">
-            <X className="h-5 w-5" />
-          </button>
-          {selectedRequest?.evidenceUrls && selectedRequest.evidenceUrls.length > 0 && (
-            <div className="relative h-[85vh] flex items-center justify-center">
-              <img src={selectedRequest.evidenceUrls[currentImageIndex]} alt={`Fullscreen ${currentImageIndex + 1}`} className="max-h-full max-w-full object-contain" />
-              {selectedRequest.evidenceUrls.length > 1 && (
-                <>
-                  <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors">
-                    <ChevronLeft className="h-6 w-6" />
-                  </button>
-                  <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors">
-                    <ChevronRight className="h-6 w-6" />
-                  </button>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-sm px-3 py-1 rounded">
-                    {currentImageIndex + 1} / {selectedRequest.evidenceUrls.length}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

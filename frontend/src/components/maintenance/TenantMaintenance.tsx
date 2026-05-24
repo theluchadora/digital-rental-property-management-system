@@ -6,15 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { propertyImages } from "@/data/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, CheckCircle, Plus, AlertCircle, FileText, X, Trash2, Image as ImageIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, CheckCircle, Plus, AlertCircle, FileText, X, Trash2, Image as ImageIcon, Loader2 } from "lucide-react";
 import FileUploadArea from "@/components/FileUploadArea";
 import { maintenanceApi } from "@/lib/api/maintenance";
-import { unitsApi } from "@/lib/api/units";
 import { PageLoader, StatsGridSkeleton } from "@/components/ui/loading-state";
-import type { MaintenanceRequest, MaintenanceEvidence, RentalUnit } from "@/types/api";
+import type { MaintenanceRequest, MaintenanceEvidence, LeasablePropertyOption } from "@/types/api";
+import { formatMaintenancePropertyLabel, mapMaintenanceRequest, type MappedMaintenanceRequest } from "@/lib/maintenance-utils";
+import MaintenanceEvidenceSection, { MaintenanceEvidenceThumbnail } from "@/components/maintenance/MaintenanceEvidenceSection";
 
 const priorityColors: Record<string, string> = {
   URGENT: "bg-destructive text-destructive-foreground",
@@ -32,12 +32,7 @@ const statusColors: Record<string, string> = {
   CANCELLED: "bg-muted text-muted-foreground",
 };
 
-interface ExtendedMaintenanceRequest extends MaintenanceRequest {
-  title?: string;
-  detailedDescription?: string;
-  evidenceFiles?: File[];
-  evidenceUrls?: string[];
-}
+type ExtendedMaintenanceRequest = MappedMaintenanceRequest;
 
 export default function TenantMaintenance() {
   const { user } = useAuth();
@@ -48,17 +43,15 @@ export default function TenantMaintenance() {
   const [evidencePreviews, setEvidencePreviews] = useState<string[]>([]);
   const [requests, setRequests] = useState<ExtendedMaintenanceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadRequests = async () => {
     try {
       setIsLoading(true);
       const res = await maintenanceApi.list();
-      const mapped: ExtendedMaintenanceRequest[] = (res.data.data || []).map((req: MaintenanceRequest) => ({
-        ...req,
-        title: (req as unknown as Record<string, unknown>).title as string || req.description?.split(".")[0] || "Maintenance Issue",
-        detailedDescription: req.description,
-        evidenceUrls: (req.evidence || []).map((ev: MaintenanceEvidence) => maintenanceApi.getEvidenceDownloadUrl(ev.id)),
-      }));
+      const mapped: ExtendedMaintenanceRequest[] = (res.data.data || []).map((req: MaintenanceRequest) =>
+        mapMaintenanceRequest(req)
+      );
       setRequests(mapped);
     } catch (err) {
       console.error(err);
@@ -67,20 +60,28 @@ export default function TenantMaintenance() {
     }
   };
 
-  const [availableUnits, setAvailableUnits] = useState<RentalUnit[]>([]);
+  const [leasedProperties, setLeasedProperties] = useState<LeasablePropertyOption[]>([]);
+  const [loadingLeases, setLoadingLeases] = useState(true);
 
-  const loadUnits = async () => {
+  const loadLeasedProperties = async () => {
     try {
-      const res = await unitsApi.list();
-      setAvailableUnits(res.data.data || []);
+      setLoadingLeases(true);
+      const properties = await maintenanceApi.getLeasableProperties();
+      setLeasedProperties(properties);
+      if (properties.length === 1) {
+        setNewRequest((prev) => ({ ...prev, unit: properties[0].propertyId }));
+      }
     } catch (err) {
       console.error(err);
+      setLeasedProperties([]);
+    } finally {
+      setLoadingLeases(false);
     }
   };
 
   useEffect(() => {
     loadRequests();
-    loadUnits();
+    loadLeasedProperties();
   }, []);
 
   const [selectedRequest, setSelectedRequest] = useState<ExtendedMaintenanceRequest | null>(null);
@@ -91,8 +92,6 @@ export default function TenantMaintenance() {
   const [cancelReason, setCancelReason] = useState("");
   const [requestToCancel, setRequestToCancel] = useState<ExtendedMaintenanceRequest | null>(null);
   const [requestToDelete, setRequestToDelete] = useState<ExtendedMaintenanceRequest | null>(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [fullscreenImageOpen, setFullscreenImageOpen] = useState(false);
   const [newRequest, setNewRequest] = useState({
     unit: "",
     category: "PLUMBING",
@@ -101,8 +100,9 @@ export default function TenantMaintenance() {
     description: "",
   });
 
-  // Filter requests for current tenant
-  const tenantRequests = requests.filter(req => req.tenant?.id === user?.id);
+  const tenantRequests = requests.filter(
+    (req) => req.createdBy === user?.id || req.tenant?.id === user?.id || req.createdByUser?.id === user?.id
+  );
 
   const truncateText = (text: string, maxLength: number = 120) => {
     if (!text) return "";
@@ -130,12 +130,13 @@ export default function TenantMaintenance() {
     if (!newRequest.title || !newRequest.description || !newRequest.unit) {
       toast({ 
         title: "Missing Information", 
-        description: "Please fill in all required fields (title, description, and unit).",
+        description: "Please fill in all required fields (leased property, title, and description).",
         variant: "destructive" 
       });
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const res = await maintenanceApi.create({
         unitId: newRequest.unit,
@@ -147,21 +148,30 @@ export default function TenantMaintenance() {
       const newId = res.data.request?.id;
 
       if (evidenceFiles.length > 0 && newId) {
+        const uploadFailures: string[] = [];
         for (const file of evidenceFiles) {
           try {
             await maintenanceApi.uploadEvidence(newId, file);
           } catch (err) {
             console.error("Failed to upload evidence:", err);
+            uploadFailures.push(file.name);
           }
+        }
+        if (uploadFailures.length > 0) {
+          toast({
+            title: "Request saved — some photos failed",
+            description: `Could not upload: ${uploadFailures.join(", ")}`,
+            variant: "destructive",
+          });
         }
       }
 
-      toast({ 
-        title: "Request Submitted", 
+      toast({
+        title: "Request Submitted",
         description: "Your maintenance request has been logged.",
       });
 
-      loadRequests();
+      await loadRequests();
       setShowNewRequestForm(false);
       setNewRequest({
         unit: "",
@@ -170,12 +180,14 @@ export default function TenantMaintenance() {
         title: "",
         description: "",
       });
-      evidencePreviews.forEach(preview => URL.revokeObjectURL(preview));
+      evidencePreviews.forEach((preview) => URL.revokeObjectURL(preview));
       setEvidenceFiles([]);
       setEvidencePreviews([]);
     } catch (err) {
       console.error(err);
       toast({ title: "Failed to submit request", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -248,26 +260,16 @@ export default function TenantMaintenance() {
     ));
   };
 
-  const openDetail = (req: ExtendedMaintenanceRequest) => {
+  const openDetail = async (req: ExtendedMaintenanceRequest) => {
     setSelectedRequest(req);
-    setCurrentImageIndex(0);
     setDetailOpen(true);
-  };
-
-  const openFullscreenImage = (index: number) => {
-    setCurrentImageIndex(index);
-    setFullscreenImageOpen(true);
-  };
-
-  const nextImage = () => {
-    if (selectedRequest?.evidenceUrls && selectedRequest.evidenceUrls.length > 0) {
-      setCurrentImageIndex((prev) => (prev + 1) % selectedRequest.evidenceUrls!.length);
-    }
-  };
-
-  const prevImage = () => {
-    if (selectedRequest?.evidenceUrls && selectedRequest.evidenceUrls.length > 0) {
-      setCurrentImageIndex((prev) => (prev - 1 + selectedRequest.evidenceUrls!.length) % selectedRequest.evidenceUrls!.length);
+    try {
+      const { data } = await maintenanceApi.getById(req.id);
+      if (data.request) {
+        setSelectedRequest(mapMaintenanceRequest(data.request));
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -366,12 +368,7 @@ export default function TenantMaintenance() {
                 </CardContent>
               </Card>
             ) : (
-              tenantRequests.map((req, idx) => {
-                const firstImage = req.evidenceUrls && req.evidenceUrls.length > 0 
-                  ? req.evidenceUrls[0] 
-                  : propertyImages[idx % propertyImages.length];
-                
-                return (
+              tenantRequests.map((req) => (
                   <Card 
                     key={req.id} 
                     className="hover:shadow-md transition-shadow cursor-pointer" 
@@ -379,22 +376,7 @@ export default function TenantMaintenance() {
                   >
                     <CardContent className="p-4">
                       <div className="flex gap-4">
-                        {/* Image - fixed size like owner page */}
-                        <div className="flex-shrink-0">
-                          <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-muted">
-                            <img 
-                              src={firstImage} 
-                              alt={req.title || req.category} 
-                              loading="lazy" 
-                              className="w-full h-full object-cover" 
-                            />
-                            {req.evidenceUrls && req.evidenceUrls.length > 1 && (
-                              <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1 rounded">
-                                +{req.evidenceUrls.length}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <MaintenanceEvidenceThumbnail evidenceUrls={req.evidenceUrls} />
                         
                         {/* Content - takes full remaining width */}
                         <div className="flex-1">
@@ -427,7 +409,7 @@ export default function TenantMaintenance() {
                           </p>
                           
                           <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 flex-wrap">
-                            <span>📍 {req.unit?.unitIdentifier}</span>
+                            <span>📍 {formatMaintenancePropertyLabel(req)}</span>
                             <span className="uppercase text-[10px]">Category: {req.category}</span>
                             <span>📅 {new Date(req.createdAt).toLocaleDateString()}</span>
                             {req.evidenceUrls && req.evidenceUrls.length > 0 && (
@@ -457,8 +439,7 @@ export default function TenantMaintenance() {
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })
+              ))
             )}
           </div>
         </div>
@@ -502,22 +483,39 @@ export default function TenantMaintenance() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div>
-              <label className="text-xs uppercase font-semibold text-muted-foreground">Unit *</label>
-              <Select value={newRequest.unit} onValueChange={val => setNewRequest({...newRequest, unit: val})}>
+              <label className="text-xs uppercase font-semibold text-muted-foreground">
+                Leased property *
+              </label>
+              <Select
+                value={newRequest.unit || undefined}
+                onValueChange={(val) => setNewRequest({ ...newRequest, unit: val })}
+                disabled={loadingLeases || leasedProperties.length === 0}
+              >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select a unit" />
+                  <SelectValue
+                    placeholder={
+                      loadingLeases
+                        ? "Loading your leases..."
+                        : leasedProperties.length === 0
+                          ? "No active leases"
+                          : "Select leased property"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableUnits.map(unit => (
-                    <SelectItem key={unit.id} value={unit.id}>
-                      {unit.unitIdentifier} - {unit.property?.title || "Property"}
+                  {leasedProperties.map((item) => (
+                    <SelectItem key={item.propertyId} value={item.propertyId}>
+                      {item.label}
+                      {item.leaseStatus === "AWAITINGPAYMENT" ? " (awaiting payment)" : ""}
                     </SelectItem>
                   ))}
-                  {availableUnits.length === 0 && (
-                    <SelectItem value="none" disabled>No units available</SelectItem>
-                  )}
                 </SelectContent>
               </Select>
+              {!loadingLeases && leasedProperties.length === 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  You need an active or pending lease before submitting maintenance requests.
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs uppercase font-semibold text-muted-foreground">Category *</label>
@@ -609,11 +607,27 @@ export default function TenantMaintenance() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowNewRequestForm(false)}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowNewRequestForm(false)}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleSubmitRequest}>
-                Submit Request
+              <Button
+                className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                onClick={handleSubmitRequest}
+                disabled={isSubmitting || loadingLeases || leasedProperties.length === 0}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Request"
+                )}
               </Button>
             </div>
           </div>
@@ -637,62 +651,7 @@ export default function TenantMaintenance() {
                 </Badge>
               </div>
               
-              {/* Image Gallery */}
-              {selectedRequest.evidenceUrls && selectedRequest.evidenceUrls.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs uppercase font-semibold text-muted-foreground">Attached Images</p>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedRequest.evidenceUrls.length} image(s)
-                    </p>
-                  </div>
-                  <div className="relative">
-                    <div className="relative h-64 md:h-96 rounded-lg overflow-hidden bg-muted">
-                      <img 
-                        src={selectedRequest.evidenceUrls[currentImageIndex]} 
-                        alt={`Evidence ${currentImageIndex + 1}`}
-                        className="h-full w-full object-contain cursor-pointer"
-                        onClick={() => openFullscreenImage(currentImageIndex)}
-                      />
-                      {selectedRequest.evidenceUrls.length > 1 && (
-                        <>
-                          <button
-                            onClick={prevImage}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
-                          >
-                            <ChevronLeft className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={nextImage}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
-                          >
-                            <ChevronRight className="h-5 w-5" />
-                          </button>
-                          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                            {currentImageIndex + 1} / {selectedRequest.evidenceUrls.length}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {/* Thumbnails */}
-                  {selectedRequest.evidenceUrls.length > 1 && (
-                    <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
-                      {selectedRequest.evidenceUrls.map((url, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setCurrentImageIndex(idx)}
-                          className={`relative flex-shrink-0 h-16 w-16 rounded-md overflow-hidden border-2 transition-all ${
-                            idx === currentImageIndex ? 'border-secondary' : 'border-transparent'
-                          }`}
-                        >
-                          <img src={url} alt={`Thumbnail ${idx + 1}`} className="h-full w-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <MaintenanceEvidenceSection evidenceUrls={selectedRequest.evidenceUrls} />
               
               {/* Full Description */}
               <div>
@@ -707,8 +666,8 @@ export default function TenantMaintenance() {
               
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-[10px] uppercase text-muted-foreground">Unit</p>
-                  <p className="font-medium">{selectedRequest.unit?.unitIdentifier}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Property</p>
+                  <p className="font-medium">{formatMaintenancePropertyLabel(selectedRequest)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] uppercase text-muted-foreground">Category</p>
@@ -878,45 +837,6 @@ export default function TenantMaintenance() {
         </DialogContent>
       </Dialog>
 
-      {/* Fullscreen Image Dialog */}
-      <Dialog open={fullscreenImageOpen} onOpenChange={setFullscreenImageOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95">
-          <button
-            onClick={() => setFullscreenImageOpen(false)}
-            className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors z-10"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          {selectedRequest?.evidenceUrls && selectedRequest.evidenceUrls.length > 0 && (
-            <div className="relative h-[85vh] flex items-center justify-center">
-              <img 
-                src={selectedRequest.evidenceUrls[currentImageIndex]} 
-                alt={`Fullscreen ${currentImageIndex + 1}`}
-                className="max-h-full max-w-full object-contain"
-              />
-              {selectedRequest.evidenceUrls.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
-                  >
-                    <ChevronLeft className="h-6 w-6" />
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
-                  >
-                    <ChevronRight className="h-6 w-6" />
-                  </button>
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-sm px-3 py-1 rounded">
-                    {currentImageIndex + 1} / {selectedRequest.evidenceUrls.length}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

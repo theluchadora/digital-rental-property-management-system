@@ -1,8 +1,49 @@
+import prisma from "../config/db";
 import { Prisma, NotificationType } from "@prisma/client";
 import * as maintenanceRepo from "../repositories/maintenanceRepository";
 import * as maintenanceEvidenceRepo from "../repositories/maintenanceEvidenceRepository";
 import * as propertiesRepo from "../repositories/propertiesRepository";
 import * as notificationsService from "./notificationsService";
+
+export const getLeasablePropertiesForTenant = async (tenantId: string) => {
+  const leases = await prisma.lease.findMany({
+    where: {
+      tenantId,
+      status: { in: ["ACTIVE", "AWAITINGPAYMENT"] },
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      property: {
+        select: {
+          id: true,
+          title: true,
+          unitNumber: true,
+          type: true,
+          city: true,
+          address: true,
+          parent: { select: { id: true, title: true } },
+        },
+      },
+    },
+  });
+
+  return leases.map((lease) => {
+    const p = lease.property;
+    const unitLabel = p.unitNumber ? `Unit ${p.unitNumber}` : null;
+    const buildingLabel = p.parent?.title;
+    const label = [p.title, unitLabel, buildingLabel ? `at ${buildingLabel}` : null]
+      .filter(Boolean)
+      .join(" · ");
+
+    return {
+      leaseId: lease.id,
+      propertyId: p.id,
+      label,
+      leaseStatus: lease.status,
+      property: p,
+    };
+  });
+};
 
 export const createMaintenance = async (input: {
   propertyId: string;
@@ -13,6 +54,17 @@ export const createMaintenance = async (input: {
 }) => {
   const property = await propertiesRepo.getPropertyById(input.propertyId);
   if (!property) throw new Error("Property not found");
+
+  const activeLease = await prisma.lease.findFirst({
+    where: {
+      tenantId: input.createdBy,
+      propertyId: input.propertyId,
+      status: { in: ["ACTIVE", "AWAITINGPAYMENT"] },
+    },
+  });
+  if (!activeLease) {
+    throw new Error("You can only submit maintenance for a property you are currently leased on");
+  }
 
   const created = await maintenanceRepo.createMaintenance({
     property: { connect: { id: input.propertyId } },
