@@ -54,7 +54,7 @@ export const getById = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Unit not found" });
     }
     logger.info({ route: "GET /units/:id", id: req.params.id, found: true }, "Unit lookup");
-    res.json({ unit });
+    res.json({ unit, property: unit });
   } catch (err: any) {
     logger.error({ err, route: "GET /units/:id", id: req.params.id }, "Unit detail failed");
     res.status(500).json({ error: err.message || "Failed to get unit" });

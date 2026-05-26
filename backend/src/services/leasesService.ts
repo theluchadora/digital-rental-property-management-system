@@ -30,7 +30,10 @@ import * as leaseDocumentsService from "./leaseDocumentsService";
 // };
 
 export const getLeaseById = async (id: string) => {
-  return await leasesRepo.getLeaseById(id);
+  const lease = await leasesRepo.getLeaseById(id);
+  if (!lease?.property) return lease;
+  const property = await propertiesService.attachPhotos(lease.property);
+  return { ...lease, property };
 };
 
 export const getLeasesByTenantId = async (tenantId: string) => {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import PropertyImage from "@/components/PropertyImage";
 
 interface PhotoGalleryDialogProps {
   images: string[];
@@ -28,7 +29,7 @@ export default function PhotoGalleryDialog({ images, initialIndex = 0, open, onO
           </button>
 
           <div className="relative flex items-center justify-center bg-muted min-h-[50vh] max-h-[80vh]">
-            <img
+            <PropertyImage
               src={images[currentIndex]}
               alt={`Photo ${currentIndex + 1}`}
               className="max-h-[80vh] w-full object-contain"
@@ -71,7 +72,11 @@ export default function PhotoGalleryDialog({ images, initialIndex = 0, open, onO
                     i === currentIndex ? "border-secondary" : "border-transparent opacity-60 hover:opacity-100"
                   }`}
                 >
-                  <img src={img} alt={`Thumb ${i + 1}`} className="h-full w-full object-cover" />
+                  <PropertyImage
+                    src={img}
+                    alt={`Thumb ${i + 1}`}
+                    className="h-full w-full object-cover"
+                  />
                 </button>
               ))}
             </div>

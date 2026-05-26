@@ -5,6 +5,7 @@ import {
   getPropertyIdsWithBlockingLeases,
   isAvailableForPublicListing,
 } from "./propertyAvailability";
+import { filterPropertyPhotoUrls } from "../utils/propertyPhotoUrls";
 import { Property as DbProperty } from "@prisma/client";
 
 type SafeProperty = DbProperty & { photos?: string[] };
@@ -14,20 +15,42 @@ const sanitize = (property: DbProperty): SafeProperty => {
   return property;
 };
 
-/** Load photo URLs for a property; for multi-unit parents, use first unit with photos. */
-const attachPhotos = async (property: DbProperty): Promise<SafeProperty> => {
-  let photos = (await photosService.getPhotosByProperty(property.id)).map((p) => p.url);
+/** Load photo URLs — same rules for owner portfolio, tenant browse, and detail. */
+export const attachPhotos = async (property: DbProperty): Promise<SafeProperty> => {
+  const ownPhotos = (await photosService.getPhotosByProperty(property.id)).map(
+    (p) => p.url
+  );
 
+  let photos = ownPhotos;
+
+  if (property.parentId) {
+    const parentPhotos = (
+      await photosService.getPhotosByProperty(property.parentId)
+    ).map((p) => p.url);
+
+    if (property.type === "UNIT") {
+      // Units: show building gallery first (what owners see on the property), then unit uploads
+      photos = filterPropertyPhotoUrls([...parentPhotos, ...ownPhotos]);
+    } else if (photos.length === 0) {
+      photos = parentPhotos;
+    }
+  }
+
+  // Building with units: use first child unit that has photos
   if (photos.length === 0 && property.hasUnits) {
     const units = await propertiesRepo.getUnitsByPropertyId(property.id);
     for (const unit of units) {
-      const unitPhotos = (await photosService.getPhotosByProperty(unit.id)).map((p) => p.url);
+      const unitPhotos = (await photosService.getPhotosByProperty(unit.id)).map(
+        (p) => p.url
+      );
       if (unitPhotos.length > 0) {
         photos = unitPhotos;
         break;
       }
     }
   }
+
+  photos = filterPropertyPhotoUrls(photos);
 
   return { ...sanitize(property), photos };
 };
@@ -60,6 +83,23 @@ export const getPropertyById = async (id: string): Promise<SafeProperty | null> 
   const prop = await propertiesRepo.getPropertyById(id);
   if (!prop) return null;
   return attachPhotos(prop);
+};
+
+/** Full listing for detail views (photos + child units when applicable). */
+export const getPropertyDetail = async (
+  id: string
+): Promise<(SafeProperty & { units?: SafeProperty[] }) | null> => {
+  const prop = await propertiesRepo.getPropertyById(id);
+  if (!prop) return null;
+
+  const withPhotos = await attachPhotos(prop);
+
+  if (prop.hasUnits) {
+    const units = await getVacantUnitsUnderProperty(prop.id);
+    return { ...withPhotos, units };
+  }
+
+  return withPhotos;
 };
 
 export const listProperties = async (): Promise<SafeProperty[]> => {
@@ -137,6 +177,7 @@ export const searchProperties = async (
 export default {
   createProperty,
   getPropertyById,
+  getPropertyDetail,
   listProperties,
   getPropertiesByOwner,
   getUnitsUnderProperty,

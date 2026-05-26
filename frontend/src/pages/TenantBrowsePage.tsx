@@ -9,6 +9,7 @@ import { Bed, Bath, Maximize, Filter, X, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { unitsApi } from "@/lib/api/units";
 import { CardGridSkeleton } from "@/components/ui/loading-state";
+import PropertyCardGallery from "@/components/PropertyCardGallery";
 import type { Property } from "@/types/api";
 
 export default function TenantBrowsePage() {
@@ -228,27 +229,11 @@ export default function TenantBrowsePage() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-2">
-              {filteredUnits.map((unit) => {
-                const firstPhoto =
-                  typeof unit.photos?.[0] === "string"
-                    ? unit.photos[0]
-                    : unit.photos?.[0]?.url;
-                return (
+              {filteredUnits.map((unit) => (
                   <Card key={unit.id} className="group overflow-hidden transition-shadow hover:shadow-lg">
                     <div className="relative h-44 md:h-52 overflow-hidden">
-                      {firstPhoto ? (
-                        <img 
-                          src={firstPhoto} 
-                          alt={unit.unitNumber || unit.title} 
-                          loading="lazy" 
-                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-gradient-to-br from-secondary/20 to-primary/20 flex items-center justify-center">
-                          <span className="text-muted-foreground">No Image</span>
-                        </div>
-                      )}
-                      <Badge className="absolute left-3 top-3 bg-secondary text-secondary-foreground text-xs">
+                      <PropertyCardGallery property={unit} />
+                      <Badge className="absolute left-3 top-3 z-10 bg-secondary text-secondary-foreground text-xs">
                         {unit.status === "VACANT" ? "AVAILABLE" : unit.status}
                       </Badge>
                     </div>
@@ -284,8 +269,7 @@ export default function TenantBrowsePage() {
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
+              ))}
             </div>
           )}
         </div>

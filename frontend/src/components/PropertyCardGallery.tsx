@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import PhotoGalleryDialog from "@/components/PhotoGalleryDialog";
+import PropertyImage from "@/components/PropertyImage";
 import { getPropertyPhotoUrls } from "@/lib/property-photos";
 import type { Property } from "@/types/api";
 
@@ -9,15 +10,23 @@ interface PropertyCardGalleryProps {
   className?: string;
 }
 
-export default function PropertyCardGallery({ property, className = "" }: PropertyCardGalleryProps) {
+export default function PropertyCardGallery({
+  property,
+  className = "",
+}: PropertyCardGalleryProps) {
   const images = getPropertyPhotoUrls(property.photos);
   const [index, setIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  if (images.length === 0) {
+  if (images.length === 0 || failed) {
     return (
-      <div className={`h-full w-full bg-gradient-to-br from-secondary/20 to-primary/20 flex items-center justify-center ${className}`}>
-        <span className="text-muted-foreground text-sm">No Image</span>
+      <div
+        className={`flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-border bg-muted/40 ${className}`}
+        aria-label="No photos available"
+      >
+        <ImageOff className="h-6 w-6 text-muted-foreground/70" />
+        <span className="text-xs text-muted-foreground">No photo</span>
       </div>
     );
   }
@@ -49,18 +58,18 @@ export default function PropertyCardGallery({ property, className = "" }: Proper
         tabIndex={0}
         onKeyDown={(e) => e.key === "Enter" && setGalleryOpen(true)}
       >
-        <img
+        <PropertyImage
           src={images[index]}
           alt={property.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+          className="h-full w-full object-cover transition-transform group-hover/gallery:scale-105"
+          onFailed={() => setFailed(true)}
         />
-        {images.length > 1 && (
+        {images.length > 1 && !failed && (
           <>
             <button
               type="button"
               onClick={prev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-1 opacity-0 group-hover/gallery:opacity-100 transition-opacity hover:bg-background"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-1 opacity-0 transition-opacity hover:bg-background group-hover/gallery:opacity-100"
               aria-label="Previous image"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -68,12 +77,12 @@ export default function PropertyCardGallery({ property, className = "" }: Proper
             <button
               type="button"
               onClick={next}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-1 opacity-0 group-hover/gallery:opacity-100 transition-opacity hover:bg-background"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/80 p-1 opacity-0 transition-opacity hover:bg-background group-hover/gallery:opacity-100"
               aria-label="Next image"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1">
               {images.map((_, i) => (
                 <span
                   key={i}

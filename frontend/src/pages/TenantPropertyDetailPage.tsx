@@ -5,36 +5,35 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, ArrowLeft, Bed, Bath, Maximize, Building2, CheckCircle, MessageSquare, CalendarCheck } from "lucide-react";
 import PhotoGalleryDialog from "@/components/PhotoGalleryDialog";
+import PropertyCardGallery from "@/components/PropertyCardGallery";
+import PropertyImage from "@/components/PropertyImage";
 import { useToast } from "@/hooks/use-toast";
-import { propertiesApi } from "@/lib/api/properties";
-import { unitsApi } from "@/lib/api/units";
 import { leasesApi } from "@/lib/api/leases";
 import { PageLoader } from "@/components/ui/loading-state";
-import { getPropertyPhotoUrls } from "@/lib/property-photos";
+import {
+  fetchPropertyListing,
+  getPropertyPhotoUrls,
+} from "@/lib/property-photos";
 import type { Property } from "@/types/api";
 
 export default function TenantPropertyDetailPage() {
   const { listingId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [property, setProperty] = useState<Property | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadProperty() {
       if (!listingId) return;
+      setIsLoading(true);
       try {
-        try {
-          const unitResponse = await unitsApi.getById(listingId);
-          setProperty(unitResponse.unit || null);
-          return;
-        } catch (unitErr) {
-          const response = await propertiesApi.getById(listingId);
-          setProperty(response || null);
-        }
+        const listing = await fetchPropertyListing(listingId);
+        setProperty(listing);
       } catch (err) {
         console.error("Failed to load property:", err);
+        setProperty(null);
       } finally {
         setIsLoading(false);
       }
@@ -42,7 +41,8 @@ export default function TenantPropertyDetailPage() {
     loadProperty();
   }, [listingId]);
 
-  const availableUnits = property?.units?.filter(u => u.status === "VACANT") || [];
+  const availableUnits =
+    property?.units?.filter((u) => u.status === "VACANT") || [];
   const rentAmount = property?.monthlyRent ? Number(property.monthlyRent) : 0;
   const isWholeProperty = property?.hasUnits === false;
   const isAvailable = property?.status === "VACANT";
@@ -52,31 +52,47 @@ export default function TenantPropertyDetailPage() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [isApplying, setIsApplying] = useState(false);
 
-  const openGallery = (index: number) => { setGalleryIndex(index); setGalleryOpen(true); };
+  const openGallery = (index: number) => {
+    setGalleryIndex(index);
+    setGalleryOpen(true);
+  };
 
   const handleApply = () => {
     if (!property) return;
     setIsApplying(true);
-    leasesApi.apply(property.id)
+    leasesApi
+      .apply(property.id)
       .then(() => {
         toast({
           title: "Application sent",
-          description: "The owner has been notified and will respond with an invoice if accepted.",
+          description:
+            "The owner has been notified and will respond with an invoice if accepted.",
         });
         navigate("/leases");
       })
       .catch((err) => {
         console.error("Failed to apply:", err);
-        const errorMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Please try again.";
-        toast({ title: "Apply failed", description: errorMsg, variant: "destructive" });
+        const errorMsg =
+          (err as { response?: { data?: { error?: string } } })?.response?.data
+            ?.error || "Please try again.";
+        toast({
+          title: "Apply failed",
+          description: errorMsg,
+          variant: "destructive",
+        });
       })
       .finally(() => setIsApplying(false));
   };
 
   const handleSchedule = () => {
     if (!property) return;
-    toast({ title: "Redirecting to Messages", description: "Chat with the owner about this listing." });
-    navigate(property.ownerId ? `/messages?userId=${property.ownerId}` : "/messages");
+    toast({
+      title: "Redirecting to Messages",
+      description: "Chat with the owner about this listing.",
+    });
+    navigate(
+      property.ownerId ? `/messages?userId=${property.ownerId}` : "/messages"
+    );
   };
 
   if (isLoading) {
@@ -87,45 +103,88 @@ export default function TenantPropertyDetailPage() {
     return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground mb-4">Property not found.</p>
-        <Link to="/browse" className="text-secondary hover:underline">Back to Browse</Link>
+        <Link to="/browse" className="text-secondary hover:underline">
+          Back to Browse
+        </Link>
       </div>
     );
   }
 
   return (
     <div>
-      <Link to="/browse" className="inline-flex items-center gap-1 text-sm text-secondary hover:underline mb-4">
+      <Link
+        to="/browse"
+        className="inline-flex items-center gap-1 text-sm text-secondary hover:underline mb-4"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to Browse
       </Link>
 
-      {/* Image Gallery */}
       {images.length > 0 ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            <div className="col-span-2 md:col-span-2 row-span-2">
-              <img src={images[0]} alt={property.title} className="h-48 md:h-72 w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(0)} />
+            <div
+              className="col-span-2 md:col-span-2 row-span-2 cursor-pointer"
+              onClick={() => openGallery(0)}
+              onKeyDown={(e) => e.key === "Enter" && openGallery(0)}
+              role="button"
+              tabIndex={0}
+            >
+              <PropertyImage
+                src={images[0]}
+                alt={property.title}
+                className="h-48 md:h-72 w-full rounded-lg object-cover hover:opacity-90 transition-opacity"
+              />
             </div>
             {images.slice(1, 4).map((img, index) => (
-              <div key={img} className={index === 0 ? "hidden md:block" : "col-span-1"}>
-                <img
+              <div
+                key={`${img}-${index}`}
+                className={`${index === 0 ? "hidden md:block" : "col-span-1"} cursor-pointer`}
+                onClick={() => openGallery(index + 1)}
+                onKeyDown={(e) => e.key === "Enter" && openGallery(index + 1)}
+                role="button"
+                tabIndex={0}
+              >
+                <PropertyImage
                   src={img}
                   alt="Gallery"
-                  className={index === 0 ? "h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" : "h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"}
-                  onClick={() => openGallery(index + 1)}
+                  className={
+                    index === 0
+                      ? "h-[calc(50%-4px)] w-full rounded-lg object-cover hover:opacity-90 transition-opacity"
+                      : "h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover hover:opacity-90 transition-opacity"
+                  }
                 />
               </div>
             ))}
             {images.length > 4 && (
-              <div className="col-span-1 relative">
-                <img src={images[3]} alt="Gallery" className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openGallery(3)} />
-                <button onClick={() => openGallery(0)} className="absolute inset-0 flex items-center justify-center rounded-lg bg-foreground/50 text-primary-foreground font-semibold hover:bg-foreground/60 transition-colors">
+              <div
+                className="col-span-1 relative cursor-pointer"
+                onClick={() => openGallery(3)}
+                onKeyDown={(e) => e.key === "Enter" && openGallery(3)}
+                role="button"
+                tabIndex={0}
+              >
+                <PropertyImage
+                  src={images[3]}
+                  alt="Gallery"
+                  className="h-24 md:h-[calc(50%-4px)] w-full rounded-lg object-cover hover:opacity-90 transition-opacity"
+                />
+                <button
+                  type="button"
+                  onClick={() => openGallery(0)}
+                  className="absolute inset-0 flex items-center justify-center rounded-lg bg-foreground/50 text-primary-foreground font-semibold hover:bg-foreground/60 transition-colors"
+                >
                   +{images.length} Photos
                 </button>
               </div>
             )}
           </div>
 
-          <PhotoGalleryDialog images={images} initialIndex={galleryIndex} open={galleryOpen} onOpenChange={setGalleryOpen} />
+          <PhotoGalleryDialog
+            images={images}
+            initialIndex={galleryIndex}
+            open={galleryOpen}
+            onOpenChange={setGalleryOpen}
+          />
         </>
       ) : (
         <div className="h-48 md:h-72 w-full rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-sm text-muted-foreground">
@@ -136,17 +195,25 @@ export default function TenantPropertyDetailPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <div>
-            <Badge className="bg-secondary text-secondary-foreground mb-2">{property.status}</Badge>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">{property.title}</h1>
+            <Badge className="bg-secondary text-secondary-foreground mb-2">
+              {property.status}
+            </Badge>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              {property.title}
+            </h1>
             <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" /> {property.address}, {property.city}
             </p>
           </div>
 
           <Card>
-            <CardHeader><CardTitle>About this Property</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>About this Property</CardTitle>
+            </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground leading-relaxed">{property.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {property.description}
+              </p>
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {[
                   { label: "Year Built", value: property.yearBuilt || "—" },
@@ -154,8 +221,12 @@ export default function TenantPropertyDetailPage() {
                   { label: "Type", value: property.type },
                 ].map((s, i) => (
                   <div key={i} className="text-center">
-                    <p className="text-lg font-bold text-foreground">{s.value}</p>
-                    <p className="text-[10px] uppercase text-muted-foreground">{s.label}</p>
+                    <p className="text-lg font-bold text-foreground">
+                      {s.value}
+                    </p>
+                    <p className="text-[10px] uppercase text-muted-foreground">
+                      {s.label}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -163,30 +234,44 @@ export default function TenantPropertyDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Pricing & Lease</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Pricing & Lease</CardTitle>
+            </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Monthly Rent</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Monthly Rent
+                </p>
                 <p className="text-xl font-semibold text-foreground">
                   {rentAmount ? `$${rentAmount.toLocaleString()}` : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Minimum Lease</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Minimum Lease
+                </p>
                 <p className="text-xl font-semibold text-foreground">
-                  {property.minLeaseMonth ? `${property.minLeaseMonth} months` : "—"}
+                  {property.minLeaseMonth
+                    ? `${property.minLeaseMonth} months`
+                    : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Late Fee</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Late Fee
+                </p>
                 <p className="text-xl font-semibold text-foreground">
                   {property.latefee ? `$${property.latefee}` : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Payment Frequency</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Payment Frequency
+                </p>
                 <p className="text-xl font-semibold text-foreground">
-                  {property.paidEvery ? `Every ${property.paidEvery} month(s)` : "—"}
+                  {property.paidEvery
+                    ? `Every ${property.paidEvery} month(s)`
+                    : "—"}
                 </p>
               </div>
             </CardContent>
@@ -194,22 +279,30 @@ export default function TenantPropertyDetailPage() {
 
           {isWholeProperty && (
             <Card>
-              <CardHeader><CardTitle>Property Details</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Property Details</CardTitle>
+              </CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Bedrooms</p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Bedrooms
+                  </p>
                   <p className="text-lg font-semibold text-foreground">
                     {property.bedrooms ?? "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Bathrooms</p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Bathrooms
+                  </p>
                   <p className="text-lg font-semibold text-foreground">
                     {property.bathrooms ?? "—"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Square Feet</p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Square Feet
+                  </p>
                   <p className="text-lg font-semibold text-foreground">
                     {property.squareFeet ?? "—"}
                   </p>
@@ -219,7 +312,9 @@ export default function TenantPropertyDetailPage() {
           )}
 
           <Card>
-            <CardHeader><CardTitle>Building Amenities</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Building Amenities</CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {[
@@ -228,79 +323,128 @@ export default function TenantPropertyDetailPage() {
                   property.hasSecurity ? "24/7 Security" : null,
                   property.hasGym ? "Fitness Center" : null,
                   property.hasPool ? "Swimming Pool" : null,
-                ].filter(Boolean).map((a, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm">
-                    <CheckCircle className="h-4 w-4 text-secondary" /> {a}
-                  </div>
-                ))}
+                ]
+                  .filter(Boolean)
+                  .map((a, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-secondary" /> {a}
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>
 
           {property.hasUnits && (
             <div>
-            <h2 className="text-xl font-bold mb-4">Available Units ({availableUnits.length})</h2>
-            <div className="space-y-4">
-              {availableUnits.map((unit, i) => (
-                <Card key={unit.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="flex flex-col sm:flex-row gap-4 p-4">
-                    {(typeof unit.photos?.[0] === "string" ? unit.photos[0] : unit.photos?.[0]?.url) ? (
-                      <img
-                        src={typeof unit.photos?.[0] === "string" ? unit.photos[0] : unit.photos![0].url}
-                        alt={unit.unitNumber || unit.title}
-                        className="h-24 w-full sm:w-32 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div className="h-24 w-full sm:w-32 rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-xs text-muted-foreground">
-                        No photo
+              <h2 className="text-xl font-bold mb-4">
+                Available Units ({availableUnits.length})
+              </h2>
+              <div className="space-y-4">
+                {availableUnits.map((unit) => (
+                  <Card
+                    key={unit.id}
+                    className="hover:shadow-md transition-shadow"
+                  >
+                    <CardContent className="flex flex-col sm:flex-row gap-4 p-4">
+                      <div className="h-24 w-full sm:w-32 shrink-0 overflow-hidden rounded-lg">
+                        <PropertyCardGallery
+                          property={unit}
+                          className="h-24 sm:w-32"
+                        />
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground">{unit.unitNumber ? `Unit ${unit.unitNumber}` : unit.title}</h3>
-                      <div className="mt-1 flex items-center gap-3 md:gap-4 text-xs text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} Beds</span>
-                        <span className="flex items-center gap-1"><Bath className="h-3 w-3" /> {unit.bathrooms} Baths</span>
-                        <span className="flex items-center gap-1"><Maximize className="h-3 w-3" /> {unit.squareFeet} sqft</span>
-                        {unit.floorNumber !== undefined && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Floor {unit.floorNumber}</span>}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground">
+                          {unit.unitNumber
+                            ? `Unit ${unit.unitNumber}`
+                            : unit.title}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-3 md:gap-4 text-xs text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <Bed className="h-3 w-3" /> {unit.bedrooms} Beds
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Bath className="h-3 w-3" /> {unit.bathrooms} Baths
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Maximize className="h-3 w-3" /> {unit.squareFeet}{" "}
+                            sqft
+                          </span>
+                          {unit.floorNumber !== undefined && (
+                            <span className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3" /> Floor{" "}
+                              {unit.floorNumber}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2">
-                      <div className="text-right">
-                        <span className="text-lg md:text-xl font-bold text-secondary">${(unit.monthlyRent || 0).toLocaleString()}</span>
-                        <span className="text-xs text-muted-foreground">/mo</span>
+                      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2">
+                        <div className="text-right">
+                          <span className="text-lg md:text-xl font-bold text-secondary">
+                            ${(unit.monthlyRent || 0).toLocaleString()}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            /mo
+                          </span>
+                        </div>
+                        <Link to={`/browse/${unit.id}`}>
+                          <Button
+                            size="sm"
+                            className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                          >
+                            VIEW UNIT
+                          </Button>
+                        </Link>
                       </div>
-                      <Link to={`/browse/${unit.id}`}>
-                        <Button size="sm" className="bg-secondary text-secondary-foreground hover:bg-secondary/90">VIEW UNIT</Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {availableUnits.length === 0 && (
-                <Card><CardContent className="p-8 text-center text-muted-foreground">No units currently available in this property.</CardContent></Card>
-              )}
+                    </CardContent>
+                  </Card>
+                ))}
+                {availableUnits.length === 0 && (
+                  <Card>
+                    <CardContent className="p-8 text-center text-muted-foreground">
+                      No units currently available in this property.
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
-          </div>
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-4">
           <Card className="border-secondary/20 bg-secondary/5">
             <CardContent className="p-6 space-y-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Starting From</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Starting From
+              </p>
               <p className="text-3xl font-bold text-secondary">
-                ${availableUnits.length > 0
-                  ? Math.min(...availableUnits.map(u => Number(u.monthlyRent || 0))).toLocaleString()
+                $
+                {availableUnits.length > 0
+                  ? Math.min(
+                      ...availableUnits.map((u) => Number(u.monthlyRent || 0))
+                    ).toLocaleString()
                   : rentAmount.toLocaleString()}
-                <span className="text-sm font-normal text-muted-foreground">/month</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  /month
+                </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {property.hasUnits ? `${availableUnits.length} unit(s) available` : "Whole property rental"}
+                {property.hasUnits
+                  ? `${availableUnits.length} unit(s) available`
+                  : "Whole property rental"}
               </p>
               {isAvailable ? (
-                <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90" onClick={handleApply} disabled={isApplying}>
-                  {isApplying ? "APPLYING..." : <><MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW</>}
+                <Button
+                  className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                  onClick={handleApply}
+                  disabled={isApplying}
+                >
+                  {isApplying ? (
+                    "APPLYING..."
+                  ) : (
+                    <>
+                      <MessageSquare className="mr-2 h-4 w-4" /> APPLY NOW
+                    </>
+                  )}
                 </Button>
               ) : (
                 <p className="text-sm text-center text-muted-foreground rounded-md border border-dashed border-border px-3 py-3">
@@ -314,7 +458,9 @@ export default function TenantPropertyDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Location</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Location</CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="h-40 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-sm">
                 <MapPin className="h-5 w-5 mr-2" /> Map View

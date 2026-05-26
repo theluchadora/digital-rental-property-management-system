@@ -49,9 +49,14 @@ export const propertiesApi = {
     return response.data;
   },
 
-  // Get single property
-  getById: async (id: string): Promise<ApiResponse<Property>> => {
-    const response = await apiClient.get(`/properties/${id}`);
+  // Get single property (?detail=true includes vacant units + photos like owner view)
+  getById: async (
+    id: string,
+    options?: { detail?: boolean }
+  ): Promise<ApiResponse<Property>> => {
+    const response = await apiClient.get(`/properties/${id}`, {
+      params: options?.detail ? { detail: "true" } : undefined,
+    });
     return response.data;
   },
 

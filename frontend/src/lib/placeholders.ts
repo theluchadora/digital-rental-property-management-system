@@ -11,6 +11,10 @@ export function getPropertyImage(index = 0): string {
   return propertyImages[((index % propertyImages.length) + propertyImages.length) % propertyImages.length];
 }
 
-export function getEntityImage(imageUrl: string | null | undefined, fallbackIndex = 0): string {
-  return imageUrl || getPropertyImage(fallbackIndex);
+/** @deprecated Do not use for listings — return null and show empty state instead. */
+export function getEntityImage(
+  imageUrl: string | null | undefined,
+  _fallbackIndex = 0
+): string | null {
+  return imageUrl?.trim() || null;
 }

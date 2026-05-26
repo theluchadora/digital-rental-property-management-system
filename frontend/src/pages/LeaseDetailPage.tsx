@@ -11,6 +11,7 @@ import { leasesApi } from "@/lib/api/leases";
 import { LeaseActionButtons } from "@/components/LeaseActionButtons";
 import TenantApplicantInfo from "@/components/TenantApplicantInfo";
 import { PageLoader } from "@/components/ui/loading-state";
+import PropertyCardGallery from "@/components/PropertyCardGallery";
 import type { Lease } from "@/types/api";
 
 const statusColors: Record<string, string> = {
@@ -175,6 +176,16 @@ export default function LeaseDetailPage() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Property Information</CardTitle></CardHeader>
             <CardContent>
+              {lease.property && (
+                <div className="mb-4 h-48 md:h-56 w-full overflow-hidden rounded-lg border border-border">
+                  <PropertyCardGallery
+                    property={{
+                      title: lease.property.title,
+                      photos: lease.property.photos,
+                    }}
+                  />
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { label: "Property", value: lease.property?.title || "—" },

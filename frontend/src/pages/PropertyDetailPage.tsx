@@ -7,6 +7,8 @@ import { MapPin, Edit, Plus, ChevronLeft, Building2, DollarSign, Bed, Bath, Car,
 import { useToast } from "@/hooks/use-toast";
 import { propertiesApi } from "@/lib/api/properties";
 import { photosApi } from "@/lib/api/photos";
+import { fetchPropertyListing, getPropertyPhotoUrls } from "@/lib/property-photos";
+import PropertyImage from "@/components/PropertyImage";
 import type { Property } from "@/types/api";
 
 export default function PropertyDetailPage() {
@@ -26,67 +28,54 @@ export default function PropertyDetailPage() {
       
       setIsLoading(true);
       try {
-        const propResponse = await propertiesApi.getById(propertyId);
-        
-        let propertyData: Property | null = null;
-        if (propResponse.data?.property) {
-          propertyData = propResponse.data.property;
-        } else if (propResponse.data?.data?.property) {
-          propertyData = propResponse.data.data.property;
-        } else if (propResponse.data?.id) {
-          propertyData = propResponse.data;
-        } else if (propResponse?.id) {
-          propertyData = propResponse;
-        }
-        
+        const propertyData = await fetchPropertyListing(propertyId);
+
         if (!propertyData) {
           toast({ title: "Error", description: "Failed to load property data", variant: "destructive" });
           setIsLoading(false);
           return;
         }
-        
+
         setProperty(propertyData);
-        
-        // Fetch photos
-        let photos = [];
+
+        let photos: { id: string; url: string; propertyId: string }[] = [];
         try {
           const photosResponse = await photosApi.getByProperty(propertyId);
-          if (photosResponse?.data && Array.isArray(photosResponse.data)) {
-            photos = photosResponse.data;
-          } else if (photosResponse && Array.isArray(photosResponse)) {
-            photos = photosResponse;
-          } else if (propertyData.photos && Array.isArray(propertyData.photos)) {
-            photos = propertyData.photos.map((photo, index) => {
-              if (typeof photo === 'string') {
-                return { id: `photo-${index}`, url: photo, propertyId: propertyId };
-              }
-              return photo;
-            });
+          const fromApi = photosResponse?.data && Array.isArray(photosResponse.data)
+            ? photosResponse.data
+            : Array.isArray(photosResponse)
+              ? photosResponse
+              : [];
+          if (fromApi.length > 0) {
+            photos = fromApi.map((p: { id?: string; url: string }) => ({
+              id: p.id || `photo-${p.url}`,
+              url: p.url,
+              propertyId,
+            }));
           }
-        } catch (photoErr) {
-          if (propertyData.photos && Array.isArray(propertyData.photos)) {
-            photos = propertyData.photos.map((photo, index) => {
-              if (typeof photo === 'string') {
-                return { id: `photo-${index}`, url: photo, propertyId: propertyId };
-              }
-              return photo;
-            });
-          }
+        } catch {
+          // use URLs from property payload
         }
-        
+
+        if (photos.length === 0) {
+          photos = getPropertyPhotoUrls(propertyData.photos).map((url, index) => ({
+            id: `photo-${index}`,
+            url,
+            propertyId,
+          }));
+        }
+
         setPropertyPhotos(photos);
-        
-        // Get units if property has units
-        if (propertyData.hasUnits) {
+
+        if (propertyData.units?.length) {
+          setUnits(propertyData.units);
+        } else if (propertyData.hasUnits) {
           const unitsResponse = await propertiesApi.getUnits(propertyId);
-          let unitsData: Property[] = [];
-          if (Array.isArray(unitsResponse.data)) {
-            unitsData = unitsResponse.data;
-          } else if (unitsResponse.data?.units) {
-            unitsData = unitsResponse.data.units;
-          } else if (Array.isArray(unitsResponse)) {
-            unitsData = unitsResponse;
-          }
+          const unitsData = Array.isArray(unitsResponse)
+            ? unitsResponse
+            : Array.isArray(unitsResponse?.data)
+              ? unitsResponse.data
+              : [];
           setUnits(unitsData);
         }
       } catch (err) {
@@ -110,8 +99,13 @@ export default function PropertyDetailPage() {
     document.body.style.overflow = 'auto';
   };
 
+  const photoCount =
+    propertyPhotos.length > 0
+      ? getPropertyPhotoUrls(propertyPhotos.map((p) => p.url)).length
+      : getPropertyPhotoUrls(property?.photos).length;
+
   const nextPhoto = () => {
-    if (selectedPhotoIndex !== null && selectedPhotoIndex < propertyPhotos.length - 1) {
+    if (selectedPhotoIndex !== null && selectedPhotoIndex < photoCount - 1) {
       setSelectedPhotoIndex(selectedPhotoIndex + 1);
     }
   };
@@ -153,12 +147,13 @@ export default function PropertyDetailPage() {
 
   const hasUnitsInside = property.hasUnits === true;
   const isVehicle = property.type === "VEHICLE";
-  const displayPhotos = propertyPhotos.length > 0 ? propertyPhotos : 
-    (property.photos?.map((p, i) => ({ id: `photo-${i}`, url: p, propertyId })) || []);
-
-  // Get first 4 photos for grid display
-  const firstFourPhotos = displayPhotos.slice(0, 4);
-  const remainingCount = displayPhotos.length - 4;
+  const galleryUrls = getPropertyPhotoUrls(
+    propertyPhotos.length > 0
+      ? propertyPhotos.map((p) => p.url)
+      : property.photos
+  );
+  const firstFourUrls = galleryUrls.slice(0, 4);
+  const remainingCount = galleryUrls.length - 4;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
@@ -198,7 +193,7 @@ export default function PropertyDetailPage() {
       </div>
 
       {/* Photo Gallery - Compact Grid Layout */}
-      {displayPhotos.length > 0 ? (
+      {galleryUrls.length > 0 ? (
         <div className="mb-6">
           <div className="grid grid-cols-4 gap-1.5 md:gap-2 h-48 md:h-64">
             {/* First photo - larger */}
@@ -206,69 +201,57 @@ export default function PropertyDetailPage() {
               className="relative col-span-2 row-span-2 rounded-lg overflow-hidden cursor-pointer bg-muted"
               onClick={() => openLightbox(0)}
             >
-              <img 
-                src={firstFourPhotos[0]?.url} 
-                alt={property.title} 
+              <PropertyImage
+                src={firstFourUrls[0]}
+                alt={property.title}
                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/800x600/e2e8f0/64748b?text=No+Image';
-                }}
               />
-              {displayPhotos.length > 1 && (
+              {galleryUrls.length > 1 && (
                 <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
                   <Camera className="h-3 w-3" />
-                  {displayPhotos.length}
+                  {galleryUrls.length}
                 </div>
               )}
             </div>
             
             {/* Second photo */}
-            {firstFourPhotos[1] && (
+            {firstFourUrls[1] && (
               <div 
-                className="relative rounded-lg overflow-hidden cursor-pointer bg-muted"
+                className="relative rounded-lg overflow-hidden cursor-pointer bg-muted min-h-[6rem]"
                 onClick={() => openLightbox(1)}
               >
-                <img 
-                  src={firstFourPhotos[1].url} 
-                  alt={`${property.title} 2`} 
+                <PropertyImage
+                  src={firstFourUrls[1]}
+                  alt={`${property.title} 2`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/400x300/e2e8f0/64748b?text=No+Image';
-                  }}
                 />
               </div>
             )}
             
             {/* Third photo */}
-            {firstFourPhotos[2] && (
+            {firstFourUrls[2] && (
               <div 
-                className="relative rounded-lg overflow-hidden cursor-pointer bg-muted"
+                className="relative rounded-lg overflow-hidden cursor-pointer bg-muted min-h-[6rem]"
                 onClick={() => openLightbox(2)}
               >
-                <img 
-                  src={firstFourPhotos[2].url} 
-                  alt={`${property.title} 3`} 
+                <PropertyImage
+                  src={firstFourUrls[2]}
+                  alt={`${property.title} 3`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/400x300/e2e8f0/64748b?text=No+Image';
-                  }}
                 />
               </div>
             )}
             
             {/* Fourth photo - with "+N" overlay if more photos exist */}
-            {firstFourPhotos[3] && (
+            {firstFourUrls[3] && (
               <div 
-                className="relative rounded-lg overflow-hidden cursor-pointer bg-muted"
+                className="relative rounded-lg overflow-hidden cursor-pointer bg-muted min-h-[6rem]"
                 onClick={() => openLightbox(3)}
               >
-                <img 
-                  src={firstFourPhotos[3].url} 
-                  alt={`${property.title} 4`} 
+                <PropertyImage
+                  src={firstFourUrls[3]}
+                  alt={`${property.title} 4`}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/400x300/e2e8f0/64748b?text=No+Image';
-                  }}
                 />
                 {remainingCount > 0 && (
                   <div 
@@ -285,7 +268,7 @@ export default function PropertyDetailPage() {
             )}
             
             {/* Fill empty slots if less than 4 photos */}
-            {displayPhotos.length === 2 && (
+            {galleryUrls.length === 2 && (
               <>
                 <div className="bg-muted rounded-lg flex items-center justify-center">
                   <span className="text-muted-foreground text-xs">No image</span>
@@ -295,7 +278,7 @@ export default function PropertyDetailPage() {
                 </div>
               </>
             )}
-            {displayPhotos.length === 3 && (
+            {galleryUrls.length === 3 && (
               <div className="bg-muted rounded-lg flex items-center justify-center">
                 <span className="text-muted-foreground text-xs">No image</span>
               </div>
@@ -316,7 +299,7 @@ export default function PropertyDetailPage() {
       )}
 
       {/* Lightbox Modal */}
-      {selectedPhotoIndex !== null && displayPhotos.length > 0 && (
+      {selectedPhotoIndex !== null && galleryUrls.length > 0 && (
         <div 
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center"
           onClick={closeLightbox}
@@ -328,7 +311,7 @@ export default function PropertyDetailPage() {
             <X className="h-8 w-8" />
           </button>
           
-          {displayPhotos.length > 1 && (
+          {galleryUrls.length > 1 && (
             <>
               <button 
                 onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
@@ -349,17 +332,14 @@ export default function PropertyDetailPage() {
             className="max-w-5xl max-h-[90vh] p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <img 
-              src={displayPhotos[selectedPhotoIndex].url} 
+            <PropertyImage
+              src={galleryUrls[selectedPhotoIndex]}
               alt={`${property.title} ${selectedPhotoIndex + 1}`}
               className="max-w-full max-h-[80vh] object-contain mx-auto"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://placehold.co/1200x800/e2e8f0/64748b?text=Image+Not+Found';
-              }}
             />
             <div className="text-center text-white mt-4">
               <p className="text-sm">
-                {selectedPhotoIndex + 1} of {displayPhotos.length}
+                {selectedPhotoIndex + 1} of {galleryUrls.length}
               </p>
             </div>
           </div>
